@@ -1,0 +1,22 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Server runtime data
+server/src/db/data/
+server/src/learning_resource/learned_interactions.jsonl
+server/src/learning_resource/learning_log.txt
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+
+# Environment and OS/editor files
+.env
+.env.*
+.DS_Store
+Thumbs.db

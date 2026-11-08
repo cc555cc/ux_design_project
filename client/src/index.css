@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Alfa+Slab+One&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-slab: "Alfa Slab One", serif;
+}

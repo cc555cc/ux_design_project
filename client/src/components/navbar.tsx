@@ -1,25 +1,25 @@
 import store_logo from "../assets/logo.svg"
 import { useState, useEffect, useRef } from 'react'
 
+export type Section = "home" | "order" | "about" | "account"
+
 type NavbarButtonProps = {
   text: string
   href: string
   active: boolean
-  onClick: () => void
+  highlight?: boolean
+  onDark: boolean
 }
 
-const sections = [
-    {label: "New & Popular", href: "#homePage"},
-    {label: "Order", href: "#orderPage"},
-    {label: "About Us", href: "#aboutPage"},
-    {label: "Account", href: "#accountPage"},
+const sections: { label: string, id: Section, highlight?: boolean }[] = [
+    {label: "New & Popular", id: "home"},
+    {label: "Order Now !", id: "order", highlight: true},
+    {label: "About Us", id: "about"},
 ];
 
-function Navbar() {
+function Navbar({currentSection}: {currentSection: Section}) {
     const logoRef = useRef<HTMLDivElement>(null) // measure where the logo is on screen //
     const [logoNeedBacking, setLogoNeedBacking] = useState(false); //control whether the logo needs a backing or not//
-
-    const [selectedSection, setSelectedSection] = useState("#homePage");
 
     useEffect(() => {
         const check = () => {
@@ -47,7 +47,7 @@ function Navbar() {
             window.removeEventListener("resize", check);
         };
 
-    }, []);
+    }, [currentSection]);
 
 
     return (
@@ -63,34 +63,56 @@ function Navbar() {
             <img src={store_logo} alt="Long Story Sub" className="h-full w-auto" />
         </div>
         
-        <div className={`flex h-full items-center gap-2 rounded-xl px-3 transition-all duration-300 ${
-            logoNeedBacking ? "bg-white/75 shadow-lg backdrop-blur-md" : "bg-transparent"
-        }`}>
-            {sections.map((s) => (
+        <div className="flex h-full items-center">
+                        {sections.map((s) => (
                 <NavbarButton
-                    key={s.href}
+                    key={s.id}
                     text={s.label}
-                    href={s.href}
-                    active={selectedSection === s.href}
-                    onClick={() => setSelectedSection(s.href)}
+                    href={`#${s.id}`}
+                    active={currentSection === s.id}
+                    highlight={s.highlight}
+                    onDark={logoNeedBacking}
                 />
             ))}
+
+            <a
+                href="#account"
+                aria-label="Account"
+                className="flex h-full items-center pl-6"
+            >
+                <span className={`flex h-11 w-11 items-center justify-center rounded-full bg-gray-200 text-gray-700 transition hover:bg-white ${
+                    currentSection === "account" ? "ring-2 ring-red-500" : ""
+                }`}>
+
+                    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+                    </svg>
+                </span>
+            </a>
         </div>   
     </nav>
   )
 }
 
-function NavbarButton({ text, href, active, onClick }: NavbarButtonProps) {
+function NavbarButton({ text, href, active, highlight, onDark }: NavbarButtonProps) {
+    const color = highlight
+        ? "text-red-600 hover:text-red-500"
+        : onDark
+        ? "text-white hover:text-amber-300"
+        : "text-gray-900 hover:text-red-600"
+
     return (
-        <a 
+        <a
             href={href}
-            onClick={onClick}
-            className={`rounded-lg px-4 py-2 font-semibold transition ${
-            active ? "bg-red-600 text-white" : "text-gray-900 hover:bg-orange-100"
-        }`}>
+            className={`flex h-full items-center px-6 font-gasoek text-lg transition-colors duration-300 ${color} ${
+                active ? "underline decoration-2 underline-offset-8" : ""
+            }`}
+        >
             {text}
         </a>
     )
 }
+
 
 export default Navbar

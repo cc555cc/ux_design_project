@@ -3,6 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import ad1 from "../assets/long_story_sub_first_order_offer_final_1920x1080.jpg"
 import ad2 from "../assets/long_story_sub_short_wait_final_1920x1080.jpg"
 import ad3 from "../assets/long_story_sub_cross_section_final_1920x1080.jpg"
+import arrowLeft from "../assets/arrow-left-circle.svg"
+import arrowRight from "../assets/arrow-right-circle.svg"
 
 const ADS = [
   { src: ad1, alt: "First order offer" },
@@ -68,16 +70,16 @@ function AdScroller() {
       <button
         onClick={() => step(-1)}
         aria-label="Previous ad"
-        className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/70 px-3 py-2 text-2xl font-bold text-gray-900 shadow hover:bg-white"
+        className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full shadow-lg transition-transform duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/80"
       >
-        ‹
+        <img src={arrowLeft} alt="" className="h-12 w-12" />
       </button>
       <button
         onClick={() => step(1)}
         aria-label="Next ad"
-        className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/70 px-3 py-2 text-2xl font-bold text-gray-900 shadow hover:bg-white"
+        className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full shadow-lg transition-transform duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/80"
       >
-        ›
+        <img src={arrowRight} alt="" className="h-12 w-12" />
       </button>
 
       {/* dots */}

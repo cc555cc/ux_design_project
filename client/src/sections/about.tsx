@@ -1,6 +1,8 @@
 import aboutPic from "../assets/about_pic.jpg"
 import { useRef } from "react"
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion"
+import GoogleMap from "../components/map.tsx"
+import { SHOPS } from "../data/shops.ts"
 
 //only one section should show at a time: about us paragrah or the contact info//
 //when scroll away from one section, it fades away while the next one fades in//
@@ -50,6 +52,11 @@ function AboutSection(){
             <motion.div ref={contactRef} style={{ opacity: contactOpacity, y: contactY }} className={panel}>
                 <h2 className="font-gasoek text-4xl text-[#D62828] pb-[0-vh]">Contact Us!</h2>
                 <StoreContactInfo/>
+                {/*map and list of shop side by side*/}
+                <div className="mt-6 grid h-[45vh] gap-6 md:grid-cols-[2fr_1fr]">
+                    <GoogleMap/>
+                    <ShopList/>
+                </div>
             </motion.div>
         </section>
     )
@@ -111,6 +118,19 @@ function StoreContactInfo(){
                 </p>
             </div>
         </div>
+    )
+}
+
+function ShopList(){
+    return(
+        <ul>
+            {SHOPS.map(shop => (
+                <li key={shop.name} className="rounded-2xl bg-gray-100 p-6">
+                    <h3 className="font-gasoek text-xl text-gray-900">{shop.name}</h3>
+                    <p className="mt-2 text-gray-700">Pickup &amp; walk-in orders welcome</p>
+                </li>
+            ))}
+        </ul>
     )
 }
 

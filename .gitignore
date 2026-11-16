@@ -20,3 +20,6 @@ build/
 .env.*
 .DS_Store
 Thumbs.db
+
+# Personal to-do lists
+TODO_*.md

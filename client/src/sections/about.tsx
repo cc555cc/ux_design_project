@@ -1,5 +1,6 @@
 import aboutPic from "../assets/about_pic.jpg"
-import { useRef } from "react"
+import shopPic from "../assets/store-icon.svg"
+import { useRef, useState } from "react"
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion"
 import GoogleMap from "../components/map.tsx"
 import { SHOPS } from "../data/shops.ts"
@@ -11,6 +12,10 @@ function AboutSection(){
     const containerRef = useRef<HTMLDivElement>(null)
     const aboutRef = useRef<HTMLDivElement>(null)
     const contactRef = useRef<HTMLDivElement>(null)
+
+    //map//
+    const [selected, setSelected] = useState<string | null>(null)
+
 
     //About will fades out as user scrolls up//
     const { scrollYProgress: aboutProgress } = useScroll({
@@ -53,9 +58,9 @@ function AboutSection(){
                 <h2 className="font-gasoek text-4xl text-[#D62828] pb-[0-vh]">Contact Us!</h2>
                 <StoreContactInfo/>
                 {/*map and list of shop side by side*/}
-                <div className="mt-6 grid h-[45vh] gap-6 md:grid-cols-[2fr_1fr]">
-                    <GoogleMap/>
-                    <ShopList/>
+                <div className="mt-6 grid gap-6 md:h-[55vh] md:grid-cols-[3fr_2fr]">
+                    <GoogleMap selectedStore={selected}/>
+                    <ShopList selectedStore={selected} onSelect={setSelected}/>
                 </div>
             </motion.div>
         </section>
@@ -95,7 +100,7 @@ function AboutParagraph(){
 
 function StoreContactInfo(){
     return(
-        <div className="mt-6 grid gap-6 md:grid-cols-3">
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl bg-gray-100 p-6">
                 <h3 className="font-gasoek text-xl text-gray-900">Delivery Hours</h3>
                 <p className="mt-2 text-gray-700">
@@ -103,13 +108,7 @@ function StoreContactInfo(){
                     Delivering within 5 km of the shop
                 </p>
             </div>
-            <div className="rounded-2xl bg-gray-100 p-6">
-                <h3 className="font-gasoek text-xl text-gray-900">Visit the Shop</h3>
-                <p className="mt-2 text-gray-700">
-                    123 Main Street<br />
-                    Pickup &amp; walk-in orders welcome
-                </p>
-            </div>
+
             <div className="rounded-2xl bg-gray-100 p-6">
                 <h3 className="font-gasoek text-xl text-gray-900">Contact</h3>
                 <p className="mt-2 text-gray-700">
@@ -121,17 +120,30 @@ function StoreContactInfo(){
     )
 }
 
-function ShopList(){
-    return(
-        <ul>
-            {SHOPS.map(shop => (
-                <li key={shop.name} className="rounded-2xl bg-gray-100 p-6">
-                    <h3 className="font-gasoek text-xl text-gray-900">{shop.name}</h3>
-                    <p className="mt-2 text-gray-700">Pickup &amp; walk-in orders welcome</p>
-                </li>
-            ))}
-        </ul>
-    )
+function ShopList({selectedStore, onSelect}: {selectedStore: string | null; onSelect: (name:string) => void}) {
+
+  return (
+    <ul className="flex flex-col gap-3 overflow-y-auto">
+      {SHOPS.map(shop => (
+        <li key={shop.name}>
+          <button
+            type="button"
+            onClick={() => onSelect(shop.name)}
+            aria-pressed={selectedStore === shop.name}
+            className={`flex w-full items-center gap-3 border-b-3 p-4 text-left transition-colors hover:bg-gray-100 ${
+              selectedStore === shop.name ? "border-[#D62828]" : "border-transparent"
+            }`}
+          >
+            <img src={shopPic} alt="" className="h-8 w-8 shrink-0" />
+            <div>
+              <h3 className="font-gasoek text-lg text-gray-900">{shop.name}</h3>
+              <p className="text-sm text-gray-700">Pickup &amp; walk-in orders welcome</p>
+            </div>
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 export default AboutSection

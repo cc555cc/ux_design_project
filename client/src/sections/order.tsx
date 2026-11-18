@@ -1,4 +1,5 @@
 import { sendChat } from "../api/chat"
+import { useState, useEffect } from "react"
 
 const toppingOptions = [
   { name: "Lettuce", color: "#7bbf68" },
@@ -9,7 +10,27 @@ const toppingOptions = [
   { name: "Black olives", color: "#393939" },
 ]
 
+const [error, setError] = useState<string | null>(null)
 const productOptions = ["Bread", "Protein", "Cheese", "Veggies", "Sauce"]
+
+//for chatbot//
+const [sessionId, setSessionId] = useState<string>()
+const [replies, setReplies] = useState<string[]>([]) //collection of past chatbot response, print on chatbot accordingly//
+
+async function chat_handler_text(message: string){
+  setError(null)
+  try{
+    const data = await sendChat(message, sessionId);
+    setSessionId(data.session_id);
+    setReplies((prev) => [...prev, data.reply]) //add new response to reply history//
+  } catch (err){
+    setError(err instanceof Error ? err.message : "Something went wrong when sending your message to the server...")
+  }
+}
+
+function chat_handler_voice(message: Blob){
+
+}
 
 function OrderSection() {
   return (

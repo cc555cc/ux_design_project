@@ -1,3 +1,5 @@
+import { sendChat } from "../api/chat"
+
 const toppingOptions = [
   { name: "Lettuce", color: "#7bbf68" },
   { name: "Tomato", color: "#d7482d" },

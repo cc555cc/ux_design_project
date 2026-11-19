@@ -1,6 +1,6 @@
 # Sandwich Ordering API
 
-Base URL: `http://127.0.0.1:8000`. Every response is JSON. CORS is open (`*`), so the frontend can call the API directly or through a Vite proxy (`'/api': 'http://127.0.0.1:8000'`).
+Base URL: `http://127.0.0.1:8010` (default). Every response is JSON. CORS is open (`*`), so the frontend can call the API directly or through a Vite proxy (`'/api': 'http://127.0.0.1:8010'`).
 
 | Method | Path | Purpose |
 |---|---|---|

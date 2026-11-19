@@ -8,7 +8,10 @@ Rule-based ordering chatbot and a small JSON-lines order store. It uses Python's
 cd server
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python src/app.py          # http://127.0.0.1:8000
+.venv/bin/python src/app.py          # http://127.0.0.1:8010
+
+# optional: override port (example keeps old 8000 behavior)
+SANDWICH_API_PORT=8000 .venv/bin/python src/app.py
 ```
 
 Optional: install WordNet so the chatbot can match word forms (e.g. "tomatoes" → "tomato"). It still works without it, using the aliases in the menu.

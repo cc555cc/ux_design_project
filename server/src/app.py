@@ -3,6 +3,7 @@
 #to generate a reply and returns it together with the current order state, which drives the sandwich animation.
 #see server/API.md for the full list of endpoints.
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -12,7 +13,7 @@ from routes.orders import handle_list_orders
 
 
 HOST = "127.0.0.1"
-PORT = 8000
+PORT = int(os.environ.get("SANDWICH_API_PORT", "8010"))
 
 #(method, path) -> handler(payload or query) returning (status code, response body)
 ROUTES = {

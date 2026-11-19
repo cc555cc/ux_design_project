@@ -20,6 +20,8 @@ const sections: { label: string, id: Section, highlight?: boolean }[] = [
 function Navbar({currentSection}: {currentSection: Section}) {
     const logoRef = useRef<HTMLDivElement>(null) // measure where the logo is on screen //
     const [logoNeedBacking, setLogoNeedBacking] = useState(false); //control whether the logo needs a backing or not//
+    const [isHidden, setIsHidden] = useState(false)
+    const lastScrollYRef = useRef(0)
 
     useEffect(() => {
         const check = () => {
@@ -37,13 +39,30 @@ function Navbar({currentSection}: {currentSection: Section}) {
             setLogoNeedBacking(theme === "dark");
         };
 
+        const onScroll = () => {
+            const currentY = window.scrollY
+            const delta = currentY - lastScrollYRef.current
+
+            if (currentY <= 8) {
+                setIsHidden(false)
+            } else if (delta > 4) {
+                setIsHidden(true)
+            } else if (delta < -4) {
+                setIsHidden(false)
+            }
+
+            lastScrollYRef.current = currentY
+            check()
+        }
+
         //when user do these action, check if the changes make logo font color overlap with content color//
+        lastScrollYRef.current = window.scrollY
         check();
-        window.addEventListener("scroll", check, { passive: true });
+        window.addEventListener("scroll", onScroll, { passive: true });
         window.addEventListener("resize", check);
 
         return () => {
-            window.removeEventListener("scroll", check);
+            window.removeEventListener("scroll", onScroll);
             window.removeEventListener("resize", check);
         };
 
@@ -51,7 +70,9 @@ function Navbar({currentSection}: {currentSection: Section}) {
 
 
     return (
-    <nav className="fixed inset-x-0 top-0 z-50 flex h-[10vh] items-center justify-between bg-transparent px-6 py-2">
+    <nav className={`fixed inset-x-0 top-0 z-50 flex h-[10vh] items-center justify-between bg-transparent px-6 py-2 transition-transform duration-300 ${
+        isHidden ? "-translate-y-full" : "translate-y-0"
+    }`}>
         {/*where the site logo locate*/}
         <div
             ref={logoRef}

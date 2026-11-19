@@ -627,9 +627,9 @@ function OrderSection() {
           padding: calc(10vh + 18px) 18px 32px;
         }
 
-        .order-shell { max-width: 1150px; margin: 0 auto; border-radius: 18px; }
+        .order-shell { width: 100%; margin: 0 auto; border-radius: 18px; }
 
-        .order-card { background: rgba(255,255,255,0.35); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 16px 36px var(--shadow); overflow: hidden; }
+        .order-card { background: rgba(255,255,255,0.35); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 16px 36px var(--shadow); overflow: hidden; min-height: calc(100vh - 10vh - 50px); }
         .layout { display: grid; grid-template-columns: 1.38fr 1fr; gap: 18px; min-height: 500px; }
         .product-panel { background: var(--panel-strong); border-right: 1px solid var(--line); padding: 18px 18px 16px; display: flex; flex-direction: column; }
         .panel-label { display: flex; align-items: center; justify-content: space-between; color: #7f716c; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; margin-bottom: 6px; }
@@ -699,7 +699,7 @@ function OrderSection() {
         .tab-button { border: 1px solid transparent; border-radius: 999px; color: #685f5d; background: rgba(255,255,255,0.2); font-size: 0.75rem; font-weight: 600; padding: 8px 14px; cursor: pointer; transition: all 0.2s ease; }
         .tab-button.active { background: #1d1d1d; color: white; border-color: rgba(0,0,0,0.08); }
 
-        .topping-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+        .topping-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 8px; }
         .topping-item { background: rgba(255,255,255,0.32); border: 1px solid rgba(95,79,69,0.1); border-radius: 12px; padding: 10px 8px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 118px; }
         .topping-item.selected { border-color: rgba(35, 32, 30, 0.25); box-shadow: 0 0 0 2px rgba(35, 32, 30, 0.08); }
         .topping-swatch { width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(44, 37, 34, 0.08); overflow: hidden; background: #f2ece7; }
@@ -721,7 +721,7 @@ function OrderSection() {
         .size-button { border: 1px solid rgba(0,0,0,0.1); border-radius: 999px; background: rgba(255,255,255,0.45); color: #554b46; padding: 5px 10px; font-size: 0.66rem; font-weight: 700; cursor: pointer; }
         .size-button.active { color: #fff; background: #292525; }
 
-        .bottom-bar { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; margin-top: 12px; align-items: end; }
+        .bottom-bar { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; margin-top: 12px; align-items: end; padding: 0 18px 28px; }
         .chat-panel { background: rgba(255,255,255,0.35); border: 1px solid rgba(85,75,70,0.1); border-radius: 16px; padding: 12px; min-height: 215px; display: flex; flex-direction: column; gap: 10px; }
         .chat-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; }
         .chat-kicker { margin: 0 0 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5f5651; }
@@ -1063,7 +1063,6 @@ function OrderSection() {
               <p className="privacy-note">
                 Privacy: this screen sends only order details needed for your sub, such as ingredients, name, and pickup time. Avoid adding payment or contact information here.
               </p>
-              <p className="platform-note">Prototype target: responsive desktop and mobile browsers with text fallback.</p>
             </div>
 
             <div>

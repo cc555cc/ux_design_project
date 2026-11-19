@@ -31,9 +31,14 @@ const toppingOptions: ToppingOption[] = [
   { name: "Ranch", color: "#e7e1cf", category: "Sauce", image: "/toppings/ranch.jpg" },
 ]
 
-const defaultSelections = ["Turkey", "Lettuce", "Tomato", "Cucumber", "Mayo"]
 const basePrice = 9.5
 const extraIngredientPrice = 0.45
+const maxIngredientPortions = 8
+type ToppingAmounts = Record<string, number>
+
+const emptyToppingAmounts: ToppingAmounts = Object.fromEntries(
+  toppingOptions.map((option) => [option.name, 0])
+)
 
 type ChatRole = "user" | "assistant"
 
@@ -53,6 +58,7 @@ type ChatbotOrderState = {
 type ChatbotResponse = {
   reply?: string
   session_id: string
+  status?: "idle" | "building" | "confirming" | "complete"
   step: string | null
   total: number
   order: ChatbotOrderState
@@ -126,7 +132,7 @@ function titleForCategory(category: ProductOption): string {
 
 function OrderSection() {
   const [activeCategory, setActiveCategory] = useState<ProductOption>("Veggies")
-  const [selectedToppings, setSelectedToppings] = useState<string[]>(defaultSelections)
+  const [toppingAmounts, setToppingAmounts] = useState<ToppingAmounts>(() => ({ ...emptyToppingAmounts }))
   const [quantity, setQuantity] = useState(1)
   const [addedCount, setAddedCount] = useState(0)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -143,35 +149,44 @@ function OrderSection() {
   )
 
   const selectedNames = useMemo(
-    () => toppingOptions.filter((option) => selectedToppings.includes(option.name)).map((option) => option.name),
-    [selectedToppings]
+    () =>
+      toppingOptions
+        .filter((option) => toppingAmounts[option.name] > 0)
+        .map((option) => `${option.name}${toppingAmounts[option.name] > 1 ? ` × ${toppingAmounts[option.name]}` : ""}`),
+    [toppingAmounts]
   )
 
   const selectedOptions = useMemo(
-    () => toppingOptions.filter((option) => selectedToppings.includes(option.name)),
-    [selectedToppings]
+    () => toppingOptions.filter((option) => toppingAmounts[option.name] > 0),
+    [toppingAmounts]
+  )
+
+  const selectedIngredientCount = useMemo(
+    () => Object.values(toppingAmounts).reduce((total, amount) => total + amount, 0),
+    [toppingAmounts]
   )
 
   const previewLayers = useMemo(() => {
     const categoryOrder: ProductOption[] = ["Sauce", "Cheese", "Protein", "Veggies"]
     return categoryOrder
-      .flatMap((category) => selectedOptions.filter((option) => option.category === category))
+      .flatMap((category) =>
+        selectedOptions
+          .filter((option) => option.category === category)
+          .flatMap((option) => Array.from({ length: toppingAmounts[option.name] }, () => option))
+      )
       .slice(0, 8)
-  }, [selectedOptions])
+  }, [selectedOptions, toppingAmounts])
 
   const breadPreviewImage = useMemo(
     () =>
-      selectedOptions.find((option) => option.category === "Bread")?.image ??
-      toppingOptions.find((option) => option.name === "Wheat")?.image ??
-      "/toppings/wheat.jpg",
+      selectedOptions.find((option) => option.category === "Bread")?.image ?? null,
     [selectedOptions]
   )
 
   const totalPrice = useMemo(() => {
-    const extras = Math.max(0, selectedToppings.length - defaultSelections.length)
-    const singleSub = basePrice + extras * extraIngredientPrice
+    const singleSub = basePrice + selectedIngredientCount * extraIngredientPrice
     return singleSub * quantity
-  }, [quantity, selectedToppings])
+  }, [quantity, selectedIngredientCount])
   const displayTotal = chatTotal ?? totalPrice
 
   const confirmationText =
@@ -190,15 +205,28 @@ function OrderSection() {
     [chatMessages]
   )
 
+  function clearPreview() {
+    setToppingAmounts({ ...emptyToppingAmounts })
+    setActiveCategory("Bread")
+    setQuantity(1)
+    setAddedCount(0)
+    setChatTotal(null)
+  }
+
   function applyChatState(response: ChatbotResponse) {
     setChatSessionId(response.session_id)
     setChatTotal(typeof response.total === "number" ? response.total : null)
 
+    if (response.status === "idle") {
+      clearPreview()
+      return
+    }
+
     if (response.order) {
       const mappedSelections = selectedToppingsFromServerOrder(response.order)
-      if (mappedSelections.length > 0) {
-        setSelectedToppings(mappedSelections)
-      }
+      const nextAmounts = { ...emptyToppingAmounts }
+      for (const name of mappedSelections.slice(0, maxIngredientPortions)) nextAmounts[name] = 1
+      setToppingAmounts(nextAmounts)
     }
 
     if (response.step && stepToCategoryMap[response.step]) {
@@ -207,6 +235,7 @@ function OrderSection() {
   }
 
   async function resetChatSession() {
+    clearPreview()
     setChatLoading(true)
     setChatError(null)
     try {
@@ -230,6 +259,14 @@ function OrderSection() {
     } finally {
       setChatLoading(false)
     }
+  }
+
+  async function cancelCurrentOrder() {
+    if (chatLoading) return
+    clearPreview()
+    setChatMessages([])
+    setChatInput("")
+    await resetChatSession()
   }
 
   async function sendChatMessage(overrideMessage?: string) {
@@ -263,10 +300,16 @@ function OrderSection() {
     }
   }
 
-  function toggleTopping(name: string) {
-    setSelectedToppings((current) =>
-      current.includes(name) ? current.filter((item) => item !== name) : [...current, name]
-    )
+  function adjustToppingAmount(name: string, delta: number) {
+    setToppingAmounts((current) => {
+      const currentTotal = Object.values(current).reduce((total, amount) => total + amount, 0)
+      if (delta > 0 && currentTotal >= maxIngredientPortions) return current
+
+      return {
+        ...current,
+        [name]: Math.min(3, Math.max(0, (current[name] ?? 0) + delta)),
+      }
+    })
     setChatTotal(null)
   }
 
@@ -301,6 +344,8 @@ function OrderSection() {
         .product-panel { background: var(--panel-strong); border-right: 1px solid var(--line); padding: 18px 18px 16px; display: flex; flex-direction: column; }
         .panel-label { display: flex; align-items: center; justify-content: space-between; color: #7f716c; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; margin-bottom: 6px; }
         .panel-label .mini-pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; background: rgba(255,255,255,0.38); }
+        .start-over-button { border: 1px solid rgba(69,56,49,0.16); border-radius: 999px; padding: 5px 10px; background: rgba(255,255,255,0.55); color: #5b504a; font-size: 0.66rem; font-weight: 700; text-transform: none; letter-spacing: normal; cursor: pointer; }
+        .start-over-button:disabled { opacity: 0.5; cursor: not-allowed; }
         .product-panel h2 { margin: 4px 0 0; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.05; letter-spacing: -0.06em; font-weight: 700; color: #2e2b2a; }
         .image-stage { margin-top: 16px; border-radius: 18px; background: linear-gradient(180deg, #dcc8b3, #c4b29d); position: relative; min-height: 300px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04); padding: 16px; }
         .sandwich-build { width: min(560px, 100%); margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 7px; }
@@ -365,12 +410,16 @@ function OrderSection() {
         .tab-button.active { background: #1d1d1d; color: white; border-color: rgba(0,0,0,0.08); }
 
         .topping-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
-        .topping-item { background: rgba(255,255,255,0.32); border: 1px solid rgba(95,79,69,0.1); border-radius: 12px; padding: 10px 8px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 118px; cursor: pointer; }
+        .topping-item { background: rgba(255,255,255,0.32); border: 1px solid rgba(95,79,69,0.1); border-radius: 12px; padding: 10px 8px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 118px; }
         .topping-item.selected { border-color: rgba(35, 32, 30, 0.25); box-shadow: 0 0 0 2px rgba(35, 32, 30, 0.08); }
         .topping-swatch { width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(44, 37, 34, 0.08); overflow: hidden; background: #f2ece7; }
         .topping-swatch img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .topping-item .name { font-size: 0.66rem; color: #4e4a48; font-weight: 600; }
-        .topping-item .badge { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.7rem; background: white; border: 1px solid rgba(0,0,0,0.08); color: #4d4c4d; }
+        .topping-stepper { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid rgba(0,0,0,0.08); border-radius: 999px; background: rgba(255,255,255,0.72); }
+        .topping-stepper button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: #403a37; font-size: 1rem; line-height: 1; cursor: pointer; }
+        .topping-stepper button:hover:not(:disabled) { background: rgba(0,0,0,0.07); }
+        .topping-stepper button:disabled { color: #b7afaa; cursor: not-allowed; }
+        .topping-stepper .amount { min-width: 15px; text-align: center; font-size: 0.72rem; font-weight: 700; color: #403a37; }
 
         .builder-summary { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.7rem; color: #625d5b; }
         .summary-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid rgba(80,72,69,0.1); border-radius: 999px; background: rgba(255,255,255,0.2); }
@@ -454,20 +503,29 @@ function OrderSection() {
             <div className="product-panel">
               <div className="panel-label">
                 <span>Your sub order</span>
-                <span className="mini-pill">Fresh made</span>
+                <button
+                  type="button"
+                  className="start-over-button"
+                  onClick={() => void cancelCurrentOrder()}
+                  disabled={chatLoading}
+                >
+                  Cancel / start new
+                </button>
               </div>
               <h2>Made just for you.</h2>
 
               <div className="image-stage" aria-label="Live sandwich preview">
                 <div className="sandwich-build">
-                  <div className="bun bun-top" style={{ backgroundImage: `url(${breadPreviewImage})` }} />
+                  {breadPreviewImage ? (
+                    <div className="bun bun-top" style={{ backgroundImage: `url(${breadPreviewImage})` }} />
+                  ) : null}
                   <div className="ingredient-stack">
                     {previewLayers.length === 0 ? (
                       <div className="ingredient-placeholder">Select toppings to build your sandwich</div>
                     ) : (
-                      previewLayers.map((item) => (
+                      previewLayers.map((item, index) => (
                         <div
-                          key={`preview-${item.name}`}
+                          key={`preview-${item.name}-${index}`}
                           className="ingredient-layer"
                           style={{
                             backgroundImage: `linear-gradient(rgba(35, 28, 23, 0.16), rgba(35, 28, 23, 0.16)), url(${item.image})`,
@@ -478,7 +536,9 @@ function OrderSection() {
                       ))
                     )}
                   </div>
-                  <div className="bun bun-bottom" style={{ backgroundImage: `url(${breadPreviewImage})` }} />
+                  {breadPreviewImage ? (
+                    <div className="bun bun-bottom" style={{ backgroundImage: `url(${breadPreviewImage})` }} />
+                  ) : null}
                 </div>
                 <div className="preview-meta">{previewLayers.length} ingredient layer{previewLayers.length === 1 ? "" : "s"} selected</div>
               </div>
@@ -505,22 +565,37 @@ function OrderSection() {
 
               <div className="topping-grid">
                 {visibleToppings.map((topping) => {
-                  const isSelected = selectedToppings.includes(topping.name)
+                  const amount = toppingAmounts[topping.name] ?? 0
+                  const isSelected = amount > 0
                   return (
-                    <button
+                    <div
                       key={topping.name}
-                      type="button"
                       className={`topping-item${isSelected ? " selected" : ""}`}
-                      onClick={() => toggleTopping(topping.name)}
                     >
                       <div className="topping-swatch" aria-hidden="true">
                         <img src={topping.image} alt="" loading="lazy" />
                       </div>
-                      <div className="badge" aria-hidden="true">
-                        {isSelected ? "✓" : "+"}
+                      <div className="topping-stepper" aria-label={`${topping.name} quantity`}>
+                        <button
+                          type="button"
+                          onClick={() => adjustToppingAmount(topping.name, -1)}
+                          disabled={amount === 0}
+                          aria-label={`Remove one portion of ${topping.name}`}
+                        >
+                          −
+                        </button>
+                        <span className="amount" aria-live="polite">{amount}</span>
+                        <button
+                          type="button"
+                          onClick={() => adjustToppingAmount(topping.name, 1)}
+                          disabled={amount === 3 || selectedIngredientCount >= maxIngredientPortions}
+                          aria-label={`Add one portion of ${topping.name}`}
+                        >
+                          +
+                        </button>
                       </div>
                       <div className="name">{topping.name}</div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -528,7 +603,7 @@ function OrderSection() {
               <div className="builder-summary">
                 <span>{selectedNames.slice(0, 3).join(" · ") || "No ingredients selected"}</span>
                 <span className="summary-pill">
-                  <strong>{selectedToppings.length}</strong> selected
+                  <strong>{selectedIngredientCount} / {maxIngredientPortions}</strong> portions
                 </span>
               </div>
             </div>

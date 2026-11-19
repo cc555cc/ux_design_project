@@ -2,6 +2,7 @@
 #what the user already said and only ask for the details that are still missing.
 #a session is identified by the session_id sent by the frontend, sessions are lost when the server restarts.
 import threading
+import time
 import uuid
 
 
@@ -19,6 +20,7 @@ ACTIVE_STATUSES = {"building", "confirming"}
 
 _sessions = {}
 _lock = threading.Lock()
+SESSION_TTL_SECONDS = 30 * 60
 
 
 def new_order():
@@ -31,18 +33,29 @@ def new_session():
         "pending": None,
         "order": new_order(),
         "order_id": None,
+        "last_accessed": time.monotonic(),
     }
 
 
 #return the session for the given id, create one if it does not exist yet
 def get_session(session_id=None):
     with _lock:
+        cutoff = time.monotonic() - SESSION_TTL_SECONDS
+        expired = [
+            stored_id
+            for stored_id, stored_session in _sessions.items()
+            if stored_session.get("last_accessed", cutoff) < cutoff
+        ]
+        for stored_id in expired:
+            del _sessions[stored_id]
+
         if not session_id:
             session_id = uuid.uuid4().hex
 
         if session_id not in _sessions:
             _sessions[session_id] = new_session()
 
+        _sessions[session_id]["last_accessed"] = time.monotonic()
         return session_id, _sessions[session_id]
 
 

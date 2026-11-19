@@ -30,6 +30,18 @@ NON_NAME_WORDS = (
     | {"it's", "its", "this", "call", "name's", "names", "just", "thanks", "thank"}
 )
 FILLER_WORDS = {"the", "any", "a", "an", "some", "more", "extra", "my", "of"}
+MAX_ORDER_INGREDIENTS = 8
+
+
+def count_selected_ingredients(order):
+    count = 0
+    for category in ("bread", "protein", "cheese"):
+        value = order.get(category)
+        if value and value != NO_SELECTION:
+            count += 1
+    for category in LIST_FIELDS:
+        count += len(order.get(category) or [])
+    return count
 
 
 #called by UI
@@ -347,7 +359,13 @@ def apply_order_details(word_list, session):
         and not any(match["category"] == "veggies" for match in additions)
     )
     if wants_all:
-        order["veggies"] = [item["name"] for item in MENU_ITEMS["veggies"]]
+        remaining = MAX_ORDER_INGREDIENTS - count_selected_ingredients({
+            **order,
+            "veggies": [],
+        })
+        order["veggies"] = [
+            item["name"] for item in MENU_ITEMS["veggies"][:max(0, remaining)]
+        ]
         changes.append("all veggies")
 
     for match in removals:
@@ -366,10 +384,12 @@ def apply_order_details(word_list, session):
         if category in LIST_FIELDS:
             if order[category] is None:
                 order[category] = []
-            if name not in order[category]:
+            if name not in order[category] and count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS:
                 order[category].append(name)
                 changes.append(name)
-        elif order[category] != name:
+        elif order[category] != name and (
+            order[category] is not None or count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS
+        ):
             order[category] = name
             changes.append(name)
 

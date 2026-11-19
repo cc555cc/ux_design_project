@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import chatbot
 from db import order_store
 from learning_resource import model_learning
+from models import order_session
 from models.order_session import NO_SELECTION, get_session
 
 
@@ -37,6 +38,21 @@ class ChatbotTestCase(unittest.TestCase):
     @property
     def order(self):
         return self.session["order"]
+
+
+class SessionLifecycleTest(unittest.TestCase):
+    def test_expired_session_is_replaced_with_fresh_order(self):
+        session_id, session = get_session()
+        session["order"]["bread"] = "Italian"
+
+        with mock.patch.object(order_session.time, "monotonic", return_value=(
+            session["last_accessed"] + order_session.SESSION_TTL_SECONDS + 1
+        )):
+            restored_id, restored_session = get_session(session_id)
+
+        self.assertEqual(restored_id, session_id)
+        self.assertIsNone(restored_session["order"]["bread"])
+        self.assertNotEqual(restored_session, session)
 
 
 class OneStepOrderTest(ChatbotTestCase):
@@ -67,8 +83,11 @@ class OneStepOrderTest(ChatbotTestCase):
 
     def test_with_everything_means_all_veggies(self):
         self.say("turkey footlong on wheat with everything and mayo")
-        self.assertEqual(len(self.order["veggies"]), 10)
-        self.assertEqual(self.order["sauce"], ["Mayo"])
+        self.assertEqual(
+            chatbot.count_selected_ingredients(self.order),
+            chatbot.MAX_ORDER_INGREDIENTS,
+        )
+        self.assertEqual(self.order["sauce"], [])
 
     def test_name_given_before_it_is_asked(self):
         self.say("italian 6 inch ham")
@@ -110,7 +129,7 @@ class StepByStepOrderTest(ChatbotTestCase):
         self.assertEqual(self.session["pending"], "sauce")
 
         self.say("chipotle and honey mustard")
-        self.assertEqual(self.order["sauce"], ["Chipotle", "Honey Mustard"])
+        self.assertEqual(self.order["sauce"], ["Chipotle"])
         self.assertEqual(self.session["pending"], "name")
 
         self.say("Zachary")

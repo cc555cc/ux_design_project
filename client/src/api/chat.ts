@@ -5,7 +5,7 @@ export type Order = {
   protein: string | null
   cheese: string | null
   veggies: string[] | null
-  sauce: string | null
+  sauce: string[] | null
   name: string | null
   pickup_time: string | null
 }

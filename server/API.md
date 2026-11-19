@@ -36,7 +36,7 @@ Every chat endpoint returns the same state object. The frontend should redraw th
 
 | Field | Meaning |
 |---|---|
-| `session_id` | Identifies the conversation. Send it back with every request. If you omit it, the server creates one and returns it. Sessions are kept in memory and are lost when the server restarts. |
+| `session_id` | Identifies the conversation. Send it back with every request. If you omit it, the server creates one and returns it. Sessions are kept in memory, expire after 30 minutes of inactivity, and are lost when the server restarts. |
 | `status` | `idle` (no order yet), `building` (collecting details), `confirming` (review shown, waiting for "yes" or a change), `complete` (order saved) |
 | `step` | The detail the bot is currently asking for: `bread`, `size`, `protein`, `cheese`, `veggies`, `sauce`, `name`, `pickup_time`, or `null` |
 | `order` | The sandwich so far (see below) |

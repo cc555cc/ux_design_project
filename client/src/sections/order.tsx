@@ -1,4 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import assemblecounter from "../assets/scene-deli-counter.png"
+import woodenPlate from "../assets/board-oak-v2.png"
+import breadTopLayer from "../assets/sandwich_layer/layer-bread-top.png"
+import breadBottomLayer from "../assets/sandwich_layer/layer-bread-bottom.png"
+import cheeseLayer from "../assets/sandwich_layer/layer-cheese.png"
+import cucumberLayer from "../assets/sandwich_layer/layer-cucumber.png"
+import lettuceLayer from "../assets/sandwich_layer/layer-lettuce.png"
+import olivesLayer from "../assets/sandwich_layer/layer-olives.png"
+import onionLayer from "../assets/sandwich_layer/layer-onion.png"
+import peppersLayer from "../assets/sandwich_layer/layer-peppers.png"
+import tomatoLayer from "../assets/sandwich_layer/layer-tomato.png"
+import turkeyLayer from "../assets/sandwich_layer/layer-turkey.png"
+import cheesePiece from "../assets/ingredients/piece-cheese.png"
+import cucumberPiece from "../assets/ingredients/piece-cucumber.png"
+import lettucePiece from "../assets/ingredients/piece-lettuce.png"
+import olivesPiece from "../assets/ingredients/piece-olives.png"
+import onionPiece from "../assets/ingredients/piece-onion.png"
+import peppersPiece from "../assets/ingredients/piece-peppers.png"
+import tomatoPiece from "../assets/ingredients/piece-tomato.png"
+import turkeyPiece from "../assets/ingredients/piece-turkey.png"
+import staffHelper from "../assets/sandwich-shop-employee-male_transparent.png"
 
 const productOptions = ["Bread", "Protein", "Cheese", "Veggies", "Sauce"] as const
 type ProductOption = (typeof productOptions)[number]
@@ -8,24 +29,28 @@ type ToppingOption = {
   color: string
   category: ProductOption
   image: string
+  /** transparent cut-out shown as the picker icon (falls back to `image`) */
+  icon?: string
+  /** transparent 1536×512 side-view layer for the sandwich preview (falls back to a labelled pill) */
+  layer?: string
 }
 
 const toppingOptions: ToppingOption[] = [
   { name: "Italian Herbs", color: "#dcbf86", category: "Bread", image: "/toppings/italian-herbs.jpg" },
   { name: "Wheat", color: "#c28f4d", category: "Bread", image: "/toppings/wheat.jpg" },
   { name: "Honey Oat", color: "#debb76", category: "Bread", image: "/toppings/honey-oat.jpg" },
-  { name: "Turkey", color: "#cc9d6d", category: "Protein", image: "/toppings/turkey.jpg" },
+  { name: "Turkey", color: "#cc9d6d", category: "Protein", image: "/toppings/turkey.jpg", icon: turkeyPiece, layer: turkeyLayer },
   { name: "Roast Beef", color: "#8c4f3d", category: "Protein", image: "/toppings/roast-beef.jpg" },
   { name: "Chicken", color: "#d4a772", category: "Protein", image: "/toppings/chicken.jpg" },
-  { name: "Cheddar", color: "#e7b839", category: "Cheese", image: "/toppings/cheddar.jpg" },
+  { name: "Cheddar", color: "#e7b839", category: "Cheese", image: "/toppings/cheddar.jpg", icon: cheesePiece, layer: cheeseLayer },
   { name: "Swiss", color: "#f1da78", category: "Cheese", image: "/toppings/swiss.jpg" },
   { name: "Provolone", color: "#f2dd9c", category: "Cheese", image: "/toppings/provolone.jpg" },
-  { name: "Lettuce", color: "#7bbf68", category: "Veggies", image: "/toppings/lettuce.jpg" },
-  { name: "Tomato", color: "#d7482d", category: "Veggies", image: "/toppings/tomato.jpg" },
-  { name: "Cucumber", color: "#8dcf64", category: "Veggies", image: "/toppings/cucumber.jpg" },
-  { name: "Red onion", color: "#d26471", category: "Veggies", image: "/toppings/red-onion.jpg" },
-  { name: "Green peppers", color: "#356a38", category: "Veggies", image: "/toppings/green-peppers.jpg" },
-  { name: "Black olives", color: "#393939", category: "Veggies", image: "/toppings/black-olives.jpg" },
+  { name: "Lettuce", color: "#7bbf68", category: "Veggies", image: "/toppings/lettuce.jpg", icon: lettucePiece, layer: lettuceLayer },
+  { name: "Tomato", color: "#d7482d", category: "Veggies", image: "/toppings/tomato.jpg", icon: tomatoPiece, layer: tomatoLayer },
+  { name: "Cucumber", color: "#8dcf64", category: "Veggies", image: "/toppings/cucumber.jpg", icon: cucumberPiece, layer: cucumberLayer },
+  { name: "Red onion", color: "#d26471", category: "Veggies", image: "/toppings/red-onion.jpg", icon: onionPiece, layer: onionLayer },
+  { name: "Green peppers", color: "#356a38", category: "Veggies", image: "/toppings/green-peppers.jpg", icon: peppersPiece, layer: peppersLayer },
+  { name: "Black olives", color: "#393939", category: "Veggies", image: "/toppings/black-olives.jpg", icon: olivesPiece, layer: olivesLayer },
   { name: "Mayo", color: "#f5e8bf", category: "Sauce", image: "/toppings/mayo.jpg" },
   { name: "Chipotle", color: "#b5573f", category: "Sauce", image: "/toppings/chipotle.jpg" },
   { name: "Ranch", color: "#e7e1cf", category: "Sauce", image: "/toppings/ranch.jpg" },
@@ -34,6 +59,40 @@ const toppingOptions: ToppingOption[] = [
 const basePrice = 9.5
 const extraIngredientPrice = 0.45
 const maxIngredientPortions = 8
+/** above this many distinct fillings, the preview shows one layer per category */
+const maxPreviewLayers = 5
+/** each extra portion of the same ingredient makes its layer this much taller (capped at 3 portions) */
+const portionStretch = 0.35
+
+type PreviewLayer = { option: ToppingOption; amount: number }
+
+/** how much of each filling peeks out below the layer above it (0–1 of its visible height) */
+const layerReveal = 0.3
+/** measured top/bottom edge of the visible food in each 1536×512 layer PNG, in image pixels */
+const layerBands = new Map<string, [top: number, bottom: number]>([
+  [turkeyLayer, [160, 356]],
+  [cheeseLayer, [152, 340]],
+  [lettuceLayer, [152, 348]],
+  [tomatoLayer, [152, 364]],
+  [cucumberLayer, [172, 332]],
+  [onionLayer, [148, 320]],
+  [peppersLayer, [172, 336]],
+  [olivesLayer, [176, 332]],
+])
+/** layers render at 88% of .sandwich-build's width, so 1 image px = 88/1536 % of that width */
+const layerPxToPct = (px: number) => (px * 88) / 1536
+
+/** negative margins that tuck a filling layer under its neighbours, scaled by its stretch */
+const layerMargins = (layer: string, stretch: number): CSSProperties => {
+  const [top, bottom] = layerBands.get(layer) ?? [160, 345]
+  const band = bottom - top
+  return {
+    marginTop: `${-layerPxToPct(top + (1 - layerReveal) * band) * stretch}%`,
+    marginBottom: `${-layerPxToPct(512 - bottom) * stretch}%`,
+  }
+}
+
+const layerStretch = (amount: number) => 1 + portionStretch * (Math.min(Math.max(amount, 1), 3) - 1)
 type ToppingAmounts = Record<string, number>
 
 const emptyToppingAmounts: ToppingAmounts = Object.fromEntries(
@@ -215,22 +274,34 @@ function OrderSection() {
     [toppingAmounts]
   )
 
-  const previewLayers = useMemo(() => {
+  // One layer per ingredient (extra portions stretch it taller instead of stacking copies).
+  // Past maxPreviewLayers distinct ingredients, collapse to one layer per category so the stack stays short.
+  const previewLayers = useMemo<PreviewLayer[]>(() => {
     const categoryOrder: ProductOption[] = ["Sauce", "Cheese", "Protein", "Veggies"]
-    return categoryOrder
-      .flatMap((category) =>
-        selectedOptions
-          .filter((option) => option.category === category)
-          .flatMap((option) => Array.from({ length: toppingAmounts[option.name] }, () => option))
-      )
-      .slice(0, 8)
+    const perIngredient = categoryOrder.flatMap((category) =>
+      selectedOptions
+        .filter((option) => option.category === category)
+        .map((option) => ({ option, amount: toppingAmounts[option.name] ?? 0 }))
+    )
+    if (perIngredient.length <= maxPreviewLayers) return perIngredient
+
+    return categoryOrder.flatMap((category) => {
+      const inCategory = perIngredient.filter((entry) => entry.option.category === category)
+      if (inCategory.length === 0) return []
+      // represent the category with an ingredient that has a real layer image, then the one with most portions
+      const representative = inCategory.reduce((best, entry) => {
+        const entryHasLayer = Boolean(entry.option.layer)
+        const bestHasLayer = Boolean(best.option.layer)
+        if (entryHasLayer !== bestHasLayer) return entryHasLayer ? entry : best
+        return entry.amount > best.amount ? entry : best
+      })
+      const categoryAmount = inCategory.reduce((total, entry) => total + entry.amount, 0)
+      return [{ option: representative.option, amount: categoryAmount }]
+    })
   }, [selectedOptions, toppingAmounts])
 
-  const breadPreviewImage = useMemo(
-    () =>
-      selectedOptions.find((option) => option.category === "Bread")?.image ?? null,
-    [selectedOptions]
-  )
+  const previewPortionCount = previewLayers.reduce((total, entry) => total + entry.amount, 0)
+
 
   const totalPrice = useMemo(() => {
     const singleSub = basePrice + selectedIngredientCount * extraIngredientPrice
@@ -253,6 +324,22 @@ function OrderSection() {
       "What would you like on your sandwich?",
     [chatMessages]
   )
+  // Only the latest exchange is shown: the staff's newest line plus the customer's newest line (if any),
+  // in the order they happened. While a reply is loading, the staff bubble is the "working on it" line.
+  const visibleExchange = useMemo<ChatMessage[]>(() => {
+    const roles = chatMessages.map((message) => message.role)
+    const userIndex = roles.lastIndexOf("user")
+    const staffIndex = roles.lastIndexOf("assistant")
+    const staff: ChatMessage = { role: "assistant", text: chatLoading ? "I’m working on that..." : lastAssistantMessage }
+    if (userIndex < 0) return [staff]
+    const user = chatMessages[userIndex]
+    return chatLoading || staffIndex > userIndex ? [user, staff] : [staff, user]
+  }, [chatMessages, chatLoading, lastAssistantMessage])
+  const chatLogRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const log = chatLogRef.current
+    if (log) log.scrollTop = log.scrollHeight
+  }, [visibleExchange])
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0)
   const cartTotal = cartItems.reduce((total, item) => total + item.total, 0)
   const assistantStatus = chatLoading
@@ -614,51 +701,83 @@ function OrderSection() {
       <style>{`
         * { box-sizing: border-box; }
         .order-section {
-          --bg: #f4f0ec;
-          --panel: #f9f6f3;
-          --panel-strong: #f0e7e1;
-          --text: #2b2a2d;
-          --line: #d8cfc5;
-          --shadow: rgba(47, 41, 35, 0.08);
-          min-height: 100vh;
-          background: var(--bg);
+          /* light slate palette — every colour on the page comes from these */
+          --bg: #e4e8e5;
+          --surface: rgba(255, 255, 255, 0.25);
+          --surface-raised: rgba(255, 255, 255, 0.6);
+          --surface-hover: rgba(255, 255, 255, 0.9);
+          --field: #ffffff;
+          --text: #1f2321;
+          --text-muted: #545b57;
+          --text-faint: #7c837f;
+          --line: rgba(31, 35, 33, 0.12);
+          --line-strong: rgba(31, 35, 33, 0.22);
+          --accent: #d62a2a;
+          --accent-hover: #e63b3b;
+          --danger: #b3261e;
+          --shadow: rgba(31, 35, 33, 0.12);
+          /* locked to the viewport: the page itself never scrolls (long lists scroll inside their own box) */
+          height: 100vh;
+          height: 100dvh;
+          overflow: hidden;
+          /* light chalk texture: fine dark grain (SVG noise tile) + brighter wiped patches + one eraser streak */
+          background-color: var(--bg);
+          background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+            radial-gradient(ellipse 55% 35% at 18% 22%, rgba(255, 255, 255, 0.55), transparent 70%),
+            radial-gradient(ellipse 45% 30% at 82% 68%, rgba(255, 255, 255, 0.45), transparent 70%),
+            radial-gradient(ellipse 35% 25% at 55% 95%, rgba(255, 255, 255, 0.35), transparent 70%),
+            linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.3) 46%, transparent 60%);
+          background-size: 220px 220px, auto, auto, auto, auto;
           font-family: Inter, "Segoe UI", sans-serif;
           color: var(--text);
-          padding: calc(10vh + 18px) 18px 32px;
+          padding: 0 18px;
         }
 
-        .order-shell { width: 100%; margin: 0 auto; border-radius: 18px; }
+        .order-shell { width: 100%; height: 100%; margin: 0 auto; border-radius: 18px; }
 
-        .order-card { background: rgba(255,255,255,0.35); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 16px 36px var(--shadow); overflow: hidden; min-height: calc(100vh - 10vh - 50px); }
-        .layout { display: grid; grid-template-columns: 1.38fr 1fr; gap: 18px; min-height: 500px; }
-        .product-panel { background: var(--panel-strong); border-right: 1px solid var(--line); padding: 18px 18px 16px; display: flex; flex-direction: column; }
-        .panel-label { display: flex; align-items: center; justify-content: space-between; color: #7f716c; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; margin-bottom: 6px; }
-        .panel-label .mini-pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; background: rgba(255,255,255,0.38); }
-        .start-over-button { border: 1px solid rgba(69,56,49,0.16); border-radius: 999px; padding: 5px 10px; background: rgba(255,255,255,0.55); color: #5b504a; font-size: 0.66rem; font-weight: 700; text-transform: none; letter-spacing: normal; cursor: pointer; }
+        /* no frame: the panels sit straight on the chalk background */
+        .order-card { height: 100%; display: flex; flex-direction: column; }
+        .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.38fr 1fr; gap: 18px; }
+        /* container-type lets .image-stage size itself from this column's width (cqw units) */
+        .product-panel { background: transparent; padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; container-type: inline-size; }
+        .panel-label { display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; margin-bottom: 6px; }
+        .panel-label .mini-pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; background: var(--surface-raised); }
+        .start-over-button { border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 10px; background: rgba(20, 17, 16, 0.6); color: #fff; font-size: 0.66rem; font-weight: 700; text-transform: none; letter-spacing: normal; cursor: pointer; }
+        .start-over-button:hover:not(:disabled) { background: rgba(20, 17, 16, 0.8); }
         .start-over-button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .product-panel h1 { margin: 4px 0 0; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.05; letter-spacing: -0.06em; font-weight: 700; color: #2e2b2a; }
-        .image-stage { margin-top: 16px; border-radius: 18px; background: linear-gradient(180deg, #dcc8b3, #c4b29d); position: relative; min-height: 300px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04); padding: 16px; }
-        .sandwich-build { width: min(560px, 100%); margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 7px; }
-        .bun {
-          width: 88%;
-          background-size: cover;
-          background-position: center;
-          box-shadow: 0 6px 12px rgba(40, 26, 17, 0.2);
-          border: 1px solid rgba(126, 80, 36, 0.2);
-        }
-        .bun-top { height: 64px; border-radius: 52px 52px 34px 34px; }
-        .bun-bottom { height: 46px; border-radius: 24px 24px 34px 34px; }
-        .ingredient-stack {
-          width: 82%;
-          max-height: 150px;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-          padding: 3px 0;
-        }
+        .product-panel h1 { margin: 4px 0 0; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.05; letter-spacing: -0.06em; font-weight: 700; color: var(--text); }
+        /* The photo (1536×1024) is drawn at the column's full width and shifted up 8.724cqw, which always
+           hides its top ~13% (the pendant lamps). The stage's height then decides how much of the
+           countertop at the bottom is shown: 52cqw ends just under the board.
+           On short screens it gives up height first (flex-shrink 20 vs the chat's 1). */
+        .image-stage { flex: 0 20 52cqw; min-height: 220px; margin: 6px 0 0; border-radius: 18px 18px 0 0; background-color: #3a2f28; background-size: 100% auto; background-position: center -8.724cqw; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2); padding: 16px 16px 34px; display: flex; flex-direction: column; justify-content: flex-end; }
+        /* sits in the 34px strip under the board instead of taking its own row */
+        .image-stage > .preview-meta { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); margin: 0; z-index: 1; white-space: nowrap; }
+        /* navbar logo box spans 8px → (10vh - 8px) from the viewport top; the stage starts 6px down */
+        .stage-heading { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+        .stage-heading > * { pointer-events: auto; }
+        .stage-heading .panel-label { position: absolute; top: calc(5vh - 6px); right: 18px; transform: translateY(-50%); margin: 0; gap: 10px; justify-content: flex-end; color: #fff; text-shadow: 0 1px 6px rgba(30, 20, 12, 0.7); }
+        /* logo img is (10vh - 24px) tall at a 560:470 ratio inside a box starting 24px from the viewport edge;
+           its right edge lands ~11.92vh from the stage's left edge, so the heading starts 16px past that */
+        .product-panel .stage-heading h1 { position: absolute; top: calc(5vh - 6px); left: calc(11.92vh + 16px); transform: translateY(-50%); margin: 0; white-space: nowrap; color: #fff; text-shadow: 0 2px 10px rgba(30, 20, 12, 0.55); }
+        /* The stack is built bottom-up (column-reverse) so each higher layer paints over the one below.
+           All layer PNGs are 1536×512 with transparent padding, so they overlap via negative margins
+           (percentages resolve against .sandwich-build's width):
+             margin-top    = -(where the next layer should land, measured from this image's top)
+             margin-bottom = -(transparent space under this image's visible content)            */
+        .sandwich-build { width: min(460px, 62%); margin: 0 auto; display: flex; flex-direction: column-reverse; align-items: center; }
+        /* margin-bottom tucks away the transparent strip under the board (117 of the PNG's 512px = 7.62% of its width) */
+        .sandwich-build > .plate { width: 100%; height: auto; margin-top: -15%; margin-bottom: -7.62%; pointer-events: none; filter: drop-shadow(0 10px 12px rgba(40, 26, 17, 0.25)); }
+        .layer { display: block; width: 88%; height: auto; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(40, 26, 17, 0.28)); }
+        /* -16.5% lands the first filling ~288px down the bread PNG, just above where the white crumb meets the crust */
+        .layer-bread-bottom { margin-top: -16.5%; margin-bottom: -6%; }
+        /* .layer-filling margins are set inline per image (see layerMargins) because each PNG has different padding */
+        .layer-bread-top { margin-bottom: -6%; }
         .ingredient-layer {
-          height: 24px;
+          width: 82%;
+          margin-top: calc(-17px * var(--stretch, 1));
+          height: calc(24px * var(--stretch, 1));
           border-radius: 999px;
           background-size: cover;
           background-position: center;
@@ -674,201 +793,327 @@ function OrderSection() {
           color: #fff;
           text-shadow: 0 1px 2px rgba(0,0,0,0.75);
         }
-        .ingredient-placeholder {
-          height: 48px;
-          border-radius: 18px;
-          display: grid;
-          place-items: center;
-          color: #4f463f;
-          border: 1px dashed rgba(66, 54, 42, 0.35);
-          background: rgba(255,255,255,0.3);
-          font-size: 0.72rem;
-          font-weight: 600;
-        }
         .preview-meta {
-          margin-top: 8px;
+          margin: 8px auto 0;
+          padding: 3px 10px;
+          width: fit-content;
+          border-radius: 999px;
+          background: rgba(20, 17, 16, 0.72);
           text-align: center;
           font-size: 0.72rem;
-          color: #5f5551;
+          color: #fff;
         }
 
-        .builder-panel { background: rgba(255,255,255,0.18); padding: 20px 18px 16px; }
+        .builder-panel { background: transparent; padding: calc(10vh + 20px) 18px 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
         .builder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .builder-title { margin: 0; font-size: clamp(1.5rem, 2vw, 2.3rem); line-height: 1.1; letter-spacing: -0.05em; font-weight: 700; }
-        .builder-tabs { display: flex; gap: 10px; list-style: none; margin: 0 0 18px; padding: 0; flex-wrap: wrap; }
-        .tab-button { border: 1px solid transparent; border-radius: 999px; color: #685f5d; background: rgba(255,255,255,0.2); font-size: 0.75rem; font-weight: 600; padding: 8px 14px; cursor: pointer; transition: all 0.2s ease; }
-        .tab-button.active { background: #1d1d1d; color: white; border-color: rgba(0,0,0,0.08); }
+        .builder-title { margin: 0; font-size: clamp(1.5rem, 2vw, 2.3rem); line-height: 1.1; letter-spacing: -0.05em; font-weight: 700; color: var(--text); }
+        .builder-tabs { display: flex; gap: 10px; list-style: none; margin: 0 0 10px; padding: 0; flex-wrap: wrap; }
+        .tab-button { border: 1px solid var(--line); border-radius: 999px; color: var(--text-muted); background: var(--surface-raised); font-size: 0.75rem; font-weight: 600; padding: 8px 14px; cursor: pointer; transition: all 0.2s ease; }
+        .tab-button:hover { color: var(--text); background: var(--surface-hover); }
+        .tab-button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
 
-        .topping-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 8px; }
-        .topping-item { background: rgba(255,255,255,0.32); border: 1px solid rgba(95,79,69,0.1); border-radius: 12px; padding: 10px 8px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 118px; }
-        .topping-item.selected { border-color: rgba(35, 32, 30, 0.25); box-shadow: 0 0 0 2px rgba(35, 32, 30, 0.08); }
-        .topping-swatch { width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(44, 37, 34, 0.08); overflow: hidden; background: #f2ece7; }
+        /* takes whatever height is left in the column and scrolls inside itself; the 4px padding keeps the
+           selected cards' outline from being clipped at the scroll edges */
+        .topping-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; align-content: start; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 0 -4px; padding: 4px; }
+        .topping-item { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 118px; }
+        .topping-item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(224, 54, 47, 0.25); }
+        .topping-swatch { width: 72px; height: 72px; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; background: var(--field); }
         .topping-swatch img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .topping-item .name { font-size: 0.66rem; color: #4e4a48; font-weight: 600; }
-        .topping-stepper { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid rgba(0,0,0,0.08); border-radius: 999px; background: rgba(255,255,255,0.72); }
-        .topping-stepper button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: #403a37; font-size: 1rem; line-height: 1; cursor: pointer; }
-        .topping-stepper button:hover:not(:disabled) { background: rgba(0,0,0,0.07); }
-        .topping-stepper button:disabled { color: #b7afaa; cursor: not-allowed; }
-        .topping-stepper .amount { min-width: 15px; text-align: center; font-size: 0.72rem; font-weight: 700; color: #403a37; }
+        /* transparent cut-outs: no box, wider frame to match the 992×672 PNGs */
+        .topping-swatch.cutout { width: 108px; height: 76px; border: 0; border-radius: 0; background: transparent; overflow: visible; }
+        .topping-swatch.cutout img { object-fit: contain; transform: scale(1.25); filter: drop-shadow(0 4px 6px rgba(31, 35, 33, 0.22)); }
+        .topping-item .name { font-size: 0.66rem; color: var(--text-muted); font-weight: 600; }
+        .topping-item.selected .name { color: var(--text); }
+        .topping-stepper { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
+        .topping-stepper button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: var(--text); font-size: 1rem; line-height: 1; cursor: pointer; }
+        .topping-stepper button:hover:not(:disabled) { background: var(--surface-hover); }
+        .topping-stepper button:disabled { color: var(--text-faint); opacity: 0.5; cursor: not-allowed; }
+        .topping-stepper .amount { min-width: 15px; text-align: center; font-size: 0.72rem; font-weight: 700; color: var(--text); }
 
-        .builder-summary { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.7rem; color: #625d5b; }
+        .builder-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.7rem; color: var(--text-muted); }
         .builder-summary-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-        .undo-button { border: 1px solid rgba(0,0,0,0.1); border-radius: 999px; background: rgba(255,255,255,0.55); padding: 4px 8px; color: #4d4541; font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .undo-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); padding: 4px 8px; color: var(--text); font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .undo-button:hover:not(:disabled) { background: var(--surface-hover); }
         .undo-button:disabled { opacity: 0.45; cursor: not-allowed; }
-        .summary-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid rgba(80,72,69,0.1); border-radius: 999px; background: rgba(255,255,255,0.2); }
-        .summary-pill strong { color: #272323; }
+        .summary-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); }
+        .summary-pill strong { color: var(--text); }
         .size-picker { display: flex; gap: 6px; margin-top: 8px; }
-        .size-button { border: 1px solid rgba(0,0,0,0.1); border-radius: 999px; background: rgba(255,255,255,0.45); color: #554b46; padding: 5px 10px; font-size: 0.66rem; font-weight: 700; cursor: pointer; }
-        .size-button.active { color: #fff; background: #292525; }
+        .size-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--text-muted); padding: 5px 10px; font-size: 0.66rem; font-weight: 700; cursor: pointer; }
+        .size-button.active { color: var(--bg); background: var(--text); border-color: var(--text); }
 
-        .bottom-bar { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; margin-top: 12px; align-items: end; padding: 0 18px 28px; }
-        .chat-panel { background: rgba(255,255,255,0.35); border: 1px solid rgba(85,75,70,0.1); border-radius: 16px; padding: 12px; min-height: 215px; display: flex; flex-direction: column; gap: 10px; }
-        .chat-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; }
-        .chat-kicker { margin: 0 0 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #5f5651; }
-        .speech { position: relative; background: rgba(255,255,255,0.3); border: 2px solid #171414; border-radius: 18px 18px 18px 0; padding: 12px 18px 10px; max-width: 300px; box-shadow: 0 8px 18px rgba(30, 23, 17, 0.08); }
-        .speech::before { content: ""; position: absolute; left: -11px; bottom: 12px; width: 18px; height: 18px; border-left: 2px solid #171414; border-bottom: 2px solid #171414; background: rgba(255,255,255,0.3); transform: rotate(35deg); border-radius: 0 0 0 8px; }
-        .speech p { margin: 0; font-size: 0.9rem; line-height: 1.4; color: #443f3d; }
-        .speech .tiny { font-size: 0.7rem; opacity: 0.85; margin-top: 8px; color: #5c544f; }
-        .chat-side { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .avatar-status { font-size: 0.62rem; font-weight: 700; color: #625650; text-align: center; }
-        .chat-avatar {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          background: linear-gradient(180deg, #f0d9c2, #d2a174);
-          position: relative;
-          box-shadow: inset 0 -8px 0 rgba(0,0,0,0.06);
-        }
-        .chat-avatar.processing { animation: avatarPulse 1.1s ease-in-out infinite; }
-        .chat-avatar.error { box-shadow: 0 0 0 3px rgba(177,31,31,0.15), inset 0 -8px 0 rgba(0,0,0,0.06); }
-        @keyframes avatarPulse { 50% { transform: scale(1.06); } }
-        .chat-avatar::before {
-          content: "";
-          position: absolute;
-          left: 11px;
-          top: 12px;
-          width: 22px;
-          height: 18px;
-          background: #f3c996;
-          border-radius: 10px 10px 12px 12px;
-        }
-        .chat-avatar::after {
-          content: "";
-          position: absolute;
-          left: 10px;
-          bottom: 6px;
-          width: 24px;
-          height: 12px;
-          background: #f7d0a3;
-          border-radius: 12px;
-          box-shadow: 0 -5px 0 0 #d75f42;
-        }
-        .chat-error { font-size: 0.72rem; color: #b11f1f; }
-        .retry-button { border: 0; background: transparent; color: #9b1c1c; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0 0 0 4px; }
+        .order-column { flex: none; margin-top: 12px; }
+        /* sits under the counter photo; fills leftover height on tall screens, scrolls inside itself if squeezed */
+        /* sits under the counter photo: the conversation on the left, the staff member on the right.
+           Fills leftover height on tall screens; if squeezed, only the conversation side scrolls. */
+        /* same width as the counter photo and runs flush to the bottom edge of the screen (square bottom corners) */
+        .chat-panel { flex: 1 1 auto; min-height: 0; margin: 12px 0 0; background: var(--surface-raised); border: 1px solid var(--line); border-bottom: none; border-radius: 16px 16px 0 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) clamp(130px, 28%, 210px); grid-template-rows: minmax(0, 1fr); }
+        .chat-display { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; padding: 12px 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+        /* margin-top: auto pushes the controls, and everything after them (heard card, help, privacy), to the bottom */
+        .chat-controls { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .chat-controls .chat-form { flex: 1 1 260px; }
+        .chat-kicker { margin: 0; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+        /* the bubble hugs the staff side; its square bottom-right corner points at them */
+        /* fills the free space between the heading and the controls; transparent so only the bubbles show */
+        /* vertical scrolling only: overflow-x is hidden so nothing can cause a sideways scrollbar */
+        .chat-log { flex: 1 1 0; min-height: 70px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; background: transparent; display: flex; flex-direction: column; gap: 12px; padding: 4px 0 6px; }
+        .speech { flex: none; align-self: flex-end; margin-right: 0; position: relative; background: var(--field); border: 2px solid var(--text); border-radius: 18px 18px 0 18px; padding: 10px 16px 8px; max-width: min(440px, 100%); overflow-wrap: anywhere; box-shadow: 0 8px 18px var(--shadow); }
+        .speech p { margin: 0; font-size: 0.9rem; line-height: 1.4; color: var(--text); }
+        /* the customer's bubble: dark, on the left, square bottom-left corner */
+        .speech.from-user { align-self: flex-start; margin: 0; background: var(--text); border-color: var(--text); border-radius: 18px 18px 18px 0; }
+        .speech.from-user p { color: var(--bg); }
+        .speech .tiny { font-size: 0.7rem; opacity: 0.85; margin-top: 8px; color: var(--text-muted); }
+        /* the cut-out (446×669) ends at the waist, so it's pinned to the panel's bottom edge like someone
+           standing behind the counter; "contain" keeps the whole figure visible at any panel height */
+        .chat-staff { position: relative; min-height: 200px; background: radial-gradient(ellipse 85% 55% at 50% 100%, rgba(214, 42, 42, 0.12), transparent 72%); }
+        .chat-staff img { position: absolute; inset: 0; width: 100%; height: 100%; padding-top: 10px; object-fit: contain; object-position: center bottom; transform-origin: 50% 100%; filter: drop-shadow(0 6px 10px rgba(31, 35, 33, 0.18)); pointer-events: none; }
+        .chat-staff.processing img { animation: staffBob 1.4s ease-in-out infinite; }
+        @keyframes staffBob { 50% { transform: translateY(-4px) rotate(-1deg); } }
+        .avatar-status { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 16px); width: max-content; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); box-shadow: 0 2px 8px var(--shadow); font-size: 0.62rem; font-weight: 700; line-height: 1.3; color: var(--text); text-align: center; }
+        .chat-staff.error .avatar-status { color: var(--danger); box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.25); }
+        .chat-error { font-size: 0.72rem; color: var(--danger); }
+        .retry-button { border: 0; background: transparent; color: var(--danger); font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0 0 0 4px; }
         .chat-form { display: flex; gap: 8px; }
-        .chat-input { flex: 1; border: 1px solid rgba(0,0,0,0.15); border-radius: 999px; padding: 8px 12px; font-size: 0.75rem; background: rgba(255,255,255,0.9); }
-        .chat-send { border: 0; border-radius: 999px; background: #23201f; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 8px 12px; cursor: pointer; }
-        .chat-send:disabled { opacity: 0.55; cursor: not-allowed; }
+        .chat-input { flex: 1; border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 12px; font-size: 0.75rem; background: var(--field); color: var(--text); }
+        .chat-input::placeholder, .checkout-input::placeholder { color: var(--text-faint); }
+        .chat-send { border: 0; border-radius: 999px; background: var(--text); color: var(--bg); font-size: 0.7rem; font-weight: 700; padding: 8px 12px; cursor: pointer; }
+        .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
         .voice-controls { display: flex; align-items: center; gap: 6px; }
-        .voice-button { border: 1px solid rgba(0,0,0,0.12); border-radius: 999px; background: rgba(255,255,255,0.62); color: #413a36; padding: 7px 10px; font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .voice-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text); padding: 7px 10px; font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .voice-button:hover:not(:disabled) { background: var(--surface-hover); }
         .voice-button:disabled { opacity: 0.48; cursor: not-allowed; }
-        .heard-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; background: rgba(255,255,255,0.58); font-size: 0.7rem; color: #4c4541; }
-        .heard-card strong { display: block; margin-bottom: 2px; color: #2e2926; }
+        .heard-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); font-size: 0.7rem; color: var(--text-muted); }
+        .heard-card strong { display: block; margin-bottom: 2px; color: var(--text); }
         .heard-actions { display: flex; gap: 5px; }
-        .platform-note { margin: 0; font-size: 0.62rem; font-weight: 700; color: #6a5e57; text-transform: uppercase; letter-spacing: 0.06em; }
-        .chat-help { margin: 0; font-size: 0.66rem; line-height: 1.35; color: #6b605a; }
-        .privacy-note { margin: 0; font-size: 0.62rem; line-height: 1.4; color: #746963; }
+        .platform-note { margin: 0; font-size: 0.62rem; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+        .chat-help { margin: 4px 0 0; font-size: 0.66rem; line-height: 1.35; color: var(--text-muted); }
+        .privacy-note { margin: 0; font-size: 0.62rem; line-height: 1.4; color: var(--text-faint); }
 
-        .order-summary { background: rgba(255,255,255,0.18); border: 1px solid rgba(85,75,70,0.1); border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .summary-meta { color: #554f4d; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .order-summary { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .summary-meta { color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
         .summary-main { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
-        .summary-main .price { font-size: 2.1rem; letter-spacing: -0.06em; font-weight: 800; color: #1a1a1a; }
-        .summary-main .price small { font-size: 0.8rem; color: #6a615d; font-weight: 600; letter-spacing: 0.03em; margin-left: 6px; }
-        .qty-box { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.3); border: 1px solid rgba(0,0,0,0.08); border-radius: 999px; padding: 6px 8px; font-weight: 700; color: #363433; }
-        .operator { width: 28px; height: 28px; border-radius: 50%; border: 0; display: grid; place-items: center; background: rgba(0,0,0,0.06); cursor: pointer; font-size: 1rem; line-height: 1; }
+        .summary-main .price { font-size: 2.1rem; letter-spacing: -0.06em; font-weight: 800; color: var(--text); }
+        .summary-main .price small { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.03em; margin-left: 6px; }
+        .qty-box { display: flex; align-items: center; gap: 8px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px; font-weight: 700; color: var(--text); }
+        .operator { width: 28px; height: 28px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--surface-hover); color: var(--text); cursor: pointer; font-size: 1rem; line-height: 1; }
         .operator:disabled { cursor: not-allowed; opacity: 0.45; }
-        .cta-button { border: none; border-radius: 999px; background: linear-gradient(180deg, #1d1b1a, #2a2626); color: white; font-weight: 700; padding: 12px 22px; box-shadow: 0 12px 18px rgba(34, 29, 27, 0.16); cursor: pointer; }
-        .confirmation { margin-top: 7px; font-size: 0.72rem; color: #625650; max-width: 220px; }
-        .order-error { margin: 7px 0 0; font-size: 0.72rem; color: #a32626; max-width: 260px; }
-        .cart-panel { margin-top: 10px; padding: 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 14px; background: rgba(255,255,255,0.48); }
+        .cta-button { border: none; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; padding: 12px 22px; box-shadow: 0 12px 18px rgba(224, 54, 47, 0.25); cursor: pointer; transition: background 0.2s ease; }
+        .cta-button:hover { background: var(--accent-hover); }
+        .confirmation { margin-top: 7px; font-size: 0.72rem; color: var(--text-muted); max-width: 220px; }
+        .order-error { margin: 7px 0 0; font-size: 0.72rem; color: var(--danger); max-width: 260px; }
+        .cart-panel { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); }
         .cart-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.78rem; }
-        .cart-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-        .cart-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px; border-radius: 10px; background: rgba(255,255,255,0.58); font-size: 0.7rem; }
-        .cart-item p { margin: 2px 0 0; color: #6b605a; }
-        .cart-remove { border: 0; background: transparent; color: #a32626; font-size: 0.68rem; cursor: pointer; }
+        .cart-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; max-height: 18vh; overflow-y: auto; scrollbar-width: thin; }
+        .cart-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px; border-radius: 10px; background: var(--field); font-size: 0.7rem; }
+        .cart-item p { margin: 2px 0 0; color: var(--text-muted); }
+        .cart-remove { border: 0; background: transparent; color: var(--danger); font-size: 0.68rem; cursor: pointer; }
         .checkout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .checkout-input { border: 1px solid rgba(0,0,0,0.12); border-radius: 999px; padding: 8px 10px; background: rgba(255,255,255,0.86); font-size: 0.72rem; }
+        .checkout-input { border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 10px; background: var(--field); color: var(--text); font-size: 0.72rem; }
         .cart-total-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.76rem; font-weight: 700; }
-        .checkout-button { border: 0; border-radius: 999px; background: #d62a2a; color: #fff; padding: 8px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; }
-        .checkout-message { margin: 8px 0 0; font-size: 0.7rem; color: #695d57; }
-        button:focus-visible, input:focus-visible { outline: 3px solid rgba(214,42,42,0.35); outline-offset: 2px; }
+        .checkout-button { border: 0; border-radius: 999px; background: var(--accent); color: #fff; padding: 8px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; }
+        .checkout-button:hover { background: var(--accent-hover); }
+        .checkout-message { margin: 8px 0 0; font-size: 0.7rem; color: var(--text-muted); }
+        button:focus-visible, input:focus-visible { outline: 3px solid rgba(240, 74, 66, 0.6); outline-offset: 2px; }
 
+        /* single column on narrow screens: too much to fit in one screen, so the page scrolls normally again */
         @media (max-width: 980px) {
+          .order-section { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 18px; }
+          .chat-panel { border-bottom: 1px solid var(--line); border-radius: 16px; }
+          .order-shell, .order-card { height: auto; }
           .layout { grid-template-columns: 1fr; }
-          .product-panel { border-right: none; border-bottom: 1px solid var(--line); }
-          .bottom-bar { grid-template-columns: 1fr; }
+          .product-panel { overflow: visible; }
+          .image-stage { flex: none; aspect-ratio: 1536 / 800; min-height: 0; }
+          .chat-display { overflow-y: visible; }
+          .chat-log { flex: none; overflow-y: visible; }
+          .builder-panel { padding-top: 20px; overflow: visible; }
+          .topping-grid { overflow: visible; }
         }
 
         @media (max-width: 700px) {
+          .product-panel .stage-heading h1 { top: calc(10vh + 2px); left: 18px; transform: none; }
           .builder-tabs { justify-content: center; }
           .topping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .summary-main { flex-direction: column; align-items: flex-start; }
-          .image-stage { min-height: 270px; }
-          .bun-top { height: 56px; }
-          .bun-bottom { height: 42px; }
-          .chat-top { flex-direction: column; align-items: flex-start; }
+          .chat-panel { grid-template-columns: minmax(0, 1fr) 110px; }
           .checkout-grid { grid-template-columns: 1fr; }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .chat-avatar.processing { animation: none; }
+          .chat-staff.processing img { animation: none; }
         }
-      `}</style>
+`}</style>
 
       <div className="order-shell">
         <div className="order-card">
           <div className="layout">
             <div className="product-panel">
-              <div className="panel-label">
-                <span>Your sub order</span>
-                <button
-                  type="button"
-                  className="start-over-button"
-                  onClick={() => void cancelCurrentOrder()}
-                  disabled={chatLoading}
-                >
-                  Cancel / start new
-                </button>
-              </div>
-              <h1>Made just for you.</h1>
-
-              <div className="image-stage" aria-label="Live sandwich preview">
-                <div className="sandwich-build">
-                  {breadPreviewImage ? (
-                    <div className="bun bun-top" style={{ backgroundImage: `url(${breadPreviewImage})` }} />
-                  ) : null}
-                  <div className="ingredient-stack">
-                    {previewLayers.length === 0 ? (
-                      <div className="ingredient-placeholder">Select toppings to build your sandwich</div>
+              <div
+                className="image-stage"
+                aria-label="Live sandwich preview"
+                data-nav-theme="dark"
+                style={{ backgroundImage: `url(${assemblecounter})` }}
+              >
+                <div className="stage-heading">
+                  <div className="panel-label">
+                    <span>Your sub order</span>
+                    <button
+                      type="button"
+                      className="start-over-button"
+                      onClick={() => void cancelCurrentOrder()}
+                      disabled={chatLoading}
+                    >
+                      Cancel / start new
+                    </button>
+                  </div>
+                  <h1>Made just for you.</h1>
+                </div>
+                {/* column-reverse: first child sits at the bottom, so this list reads plate → bread → fillings → bread */}
+                <div className="sandwich-build" aria-hidden="true">
+                  <img className="plate" src={woodenPlate} alt="" />
+                  {hasBread ? <img className="layer layer-bread-bottom" src={breadBottomLayer} alt="" /> : null}
+                  {/* previewLayers is ordered top-down, so reverse it to stack bottom-up */}
+                  {[...previewLayers].reverse().map(({ option, amount }) => {
+                    const stretch = layerStretch(amount)
+                    return option.layer ? (
+                      <img
+                        key={`preview-${option.name}`}
+                        className="layer layer-filling"
+                        src={option.layer}
+                        alt=""
+                        // a fixed ratio overrides the PNG's own 3:1, so the image stretches vertically
+                        style={{ aspectRatio: `1536 / ${Math.round(512 * stretch)}`, ...layerMargins(option.layer, stretch) }}
+                      />
                     ) : (
-                      previewLayers.map((item, index) => (
-                        <div
-                          key={`preview-${item.name}-${index}`}
-                          className="ingredient-layer"
-                          style={{
-                            backgroundImage: `linear-gradient(rgba(35, 28, 23, 0.16), rgba(35, 28, 23, 0.16)), url(${item.image})`,
-                          }}
-                        >
-                          <span>{item.name}</span>
+                      <div
+                        key={`preview-${option.name}`}
+                        className="ingredient-layer"
+                        style={{
+                          "--stretch": stretch,
+                          backgroundImage: `linear-gradient(rgba(35, 28, 23, 0.16), rgba(35, 28, 23, 0.16)), url(${option.image})`,
+                        } as CSSProperties}
+                      >
+                        <span>{option.name}</span>
+                      </div>
+                    )
+                  })}
+                  {hasBread ? <img className="layer layer-bread-top" src={breadTopLayer} alt="" /> : null}
+                </div>
+                <div className="preview-meta">
+                  {previewLayers.length === 0 && !hasBread
+                    ? "Select toppings to build your sandwich"
+                    : `${previewPortionCount} ingredient portion${previewPortionCount === 1 ? "" : "s"} selected`}
+                </div>
+              </div>
+              <div className="chat-panel" aria-label="Order chatbot">
+                {/* left: the conversation · right: the staff member you're talking to */}
+                <div className="chat-display">
+                  <p className="chat-kicker">A little help from the counter.</p>
+                  {/* see-through, scrollable conversation box: customer bubbles on the left, staff bubbles on the right */}
+                  <div className="chat-log" ref={chatLogRef} role="log" aria-live="polite">
+                    {visibleExchange.map((message, index) =>
+                      message.role === "user" ? (
+                        <div key={`user-${index}`} className="speech from-user">
+                          <p>{message.text}</p>
                         </div>
-                      ))
+                      ) : (
+                        <div key={`staff-${index}`} className="speech">
+                          <p>{message.text}</p>
+                          <div className="tiny">{selectedNames.length > 0 ? selectedNames.join(", ") : "Pick ingredients to start."}</div>
+                        </div>
+                      )
                     )}
                   </div>
-                  {breadPreviewImage ? (
-                    <div className="bun bun-bottom" style={{ backgroundImage: `url(${breadPreviewImage})` }} />
+                  {chatError ? (
+                    <div className="chat-error" role="alert">
+                      {chatError}
+                      {lastFailedMessage ? (
+                        <button type="button" className="retry-button" onClick={() => void sendChatMessage(lastFailedMessage)}>
+                          Retry
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
+
+                  {/* sits right above the message box so it is never pushed out of view */}
+                  {heardText ? (
+                    <div className="heard-card" role="status">
+                      <div>
+                        <strong>I heard:</strong>
+                        <span>{heardText}</span>
+                      </div>
+                      <div className="heard-actions">
+                        <button
+                          type="button"
+                          className="voice-button"
+                          onClick={startListening}
+                          disabled={isListening || chatLoading}
+                        >
+                          Try again
+                        </button>
+                        <button
+                          type="button"
+                          className="voice-button"
+                          onClick={() => void sendChatMessage(heardText)}
+                          disabled={chatLoading || !heardText.trim()}
+                        >
+                          Use this
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="chat-controls">
+                    <form
+                      className="chat-form"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        void sendChatMessage()
+                      }}
+                    >
+                      <input
+                        aria-label="Order message"
+                        className="chat-input"
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        placeholder="Type your order update..."
+                        disabled={chatLoading}
+                      />
+                      <button type="submit" className="chat-send" disabled={chatLoading || chatInput.trim().length === 0}>
+                        {chatLoading ? "Sending..." : "Send"}
+                      </button>
+                    </form>
+                    <div className="voice-controls" aria-label="Voice controls">
+                      <button
+                        type="button"
+                        className="voice-button"
+                        onClick={isListening ? stopListening : startListening}
+                        disabled={!voiceSupported || chatLoading}
+                        aria-pressed={isListening}
+                      >
+                        {isListening ? "Stop listening" : voiceSupported ? "Start listening" : "Voice unavailable"}
+                      </button>
+                      <button
+                        type="button"
+                        className="voice-button"
+                        onClick={isSpeaking ? stopSpeaking : speakLastResponse}
+                        disabled={!lastAssistantMessage}
+                      >
+                        {isSpeaking ? "Stop speaking" : "Hear response"}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="chat-help">
+                    Try: “Wheat bread with turkey, cheddar, lettuce, and mayo.” To correct it, say “remove the turkey” or “change to chicken.”
+                    {!voiceSupported ? " Voice input is unavailable in this browser; text input works normally." : ""}
+                  </p>
+                  <p className="privacy-note">
+                    Privacy: this screen sends only order details needed for your sub, such as ingredients, name, and pickup time. Avoid adding payment or contact information here.
+                  </p>
                 </div>
-                <div className="preview-meta">{previewLayers.length} ingredient layer{previewLayers.length === 1 ? "" : "s"} selected</div>
+                <div
+                  className={`chat-staff${chatLoading || isListening || isSpeaking ? " processing" : chatError ? " error" : ""}`}
+                >
+                  <img src={staffHelper} alt="Long Story Sub staff member helping with your order" />
+                  <span className="avatar-status" role="status">{assistantStatus}</span>
+                </div>
               </div>
             </div>
 
@@ -900,8 +1145,8 @@ function OrderSection() {
                       key={topping.name}
                       className={`topping-item${isSelected ? " selected" : ""}`}
                     >
-                      <div className="topping-swatch" aria-hidden="true">
-                        <img src={topping.image} alt="" loading="lazy" />
+                      <div className={`topping-swatch${topping.icon ? " cutout" : ""}`} aria-hidden="true">
+                        <img src={topping.icon ?? topping.image} alt="" loading="lazy" />
                       </div>
                       <div className="topping-stepper" aria-label={`${topping.name} quantity`}>
                         <button
@@ -957,193 +1202,86 @@ function OrderSection() {
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <div className="bottom-bar">
-            <div className="chat-panel" aria-label="Order chatbot">
-              <div className="chat-top">
-                <div>
-                  <p className="chat-kicker">A little help from the counter.</p>
-                  <div className="speech">
-                    <p aria-live="polite" aria-atomic="true">
-                      {chatLoading ? "I’m working on that..." : lastAssistantMessage}
-                    </p>
-                    <div className="tiny">{selectedNames.length > 0 ? selectedNames.join(", ") : "Pick ingredients to start."}</div>
-                  </div>
-                </div>
-                <div className="chat-side">
-                  <div
-                    className={`chat-avatar${chatLoading || isListening || isSpeaking ? " processing" : chatError ? " error" : ""}`}
-                    aria-hidden="true"
-                  />
-                  <span className="avatar-status" role="status">{assistantStatus}</span>
-                </div>
-              </div>
-
-              {chatError ? (
-                <div className="chat-error" role="alert">
-                  {chatError}
-                  {lastFailedMessage ? (
-                    <button type="button" className="retry-button" onClick={() => void sendChatMessage(lastFailedMessage)}>
-                      Retry
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <form
-                className="chat-form"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  void sendChatMessage()
-                }}
-              >
-                <input
-                  aria-label="Order message"
-                  className="chat-input"
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  placeholder="Type your order update..."
-                  disabled={chatLoading}
-                />
-                <button type="submit" className="chat-send" disabled={chatLoading || chatInput.trim().length === 0}>
-                  {chatLoading ? "Sending..." : "Send"}
-                </button>
-              </form>
-              <div className="voice-controls" aria-label="Voice controls">
-                <button
-                  type="button"
-                  className="voice-button"
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={!voiceSupported || chatLoading}
-                  aria-pressed={isListening}
-                >
-                  {isListening ? "Stop listening" : voiceSupported ? "Start listening" : "Voice unavailable"}
-                </button>
-                <button
-                  type="button"
-                  className="voice-button"
-                  onClick={isSpeaking ? stopSpeaking : speakLastResponse}
-                  disabled={!lastAssistantMessage}
-                >
-                  {isSpeaking ? "Stop speaking" : "Hear response"}
-                </button>
-              </div>
-              {heardText ? (
-                <div className="heard-card" role="status">
+              <div className="order-column">
+                <div className="order-summary">
                   <div>
-                    <strong>I heard:</strong>
-                    <span>{heardText}</span>
-                  </div>
-                  <div className="heard-actions">
-                    <button
-                      type="button"
-                      className="voice-button"
-                      onClick={startListening}
-                      disabled={isListening || chatLoading}
-                    >
-                      Try again
-                    </button>
-                    <button
-                      type="button"
-                      className="voice-button"
-                      onClick={() => void sendChatMessage(heardText)}
-                      disabled={chatLoading || !heardText.trim()}
-                    >
-                      Use this
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              <p className="chat-help">
-                Try: “Wheat bread with turkey, cheddar, lettuce, and mayo.” To correct it, say “remove the turkey” or “change to chicken.”
-                {!voiceSupported ? " Voice input is unavailable in this browser; text input works normally." : ""}
-              </p>
-              <p className="privacy-note">
-                Privacy: this screen sends only order details needed for your sub, such as ingredients, name, and pickup time. Avoid adding payment or contact information here.
-              </p>
-            </div>
-
-            <div>
-              <div className="order-summary">
-                <div>
-                  <div className="summary-meta">Your {proteinSummary.toLowerCase()}</div>
-                  <div className="summary-main">
-                    <div className="qty-box" aria-label="Quantity selector">
-                      <button type="button" className="operator" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity === 1}>−</button>
-                      <span>{quantity}</span>
-                      <button type="button" className="operator" onClick={() => setQuantity((value) => value + 1)}>+</button>
-                    </div>
-                    <div className="price">
-                      ${displayTotal.toFixed(2)}
-                      <small>total</small>
+                    <div className="summary-meta">Your {proteinSummary.toLowerCase()}</div>
+                    <div className="summary-main">
+                      <div className="qty-box" aria-label="Quantity selector">
+                        <button type="button" className="operator" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity === 1}>−</button>
+                        <span>{quantity}</span>
+                        <button type="button" className="operator" onClick={() => setQuantity((value) => value + 1)}>+</button>
+                      </div>
+                      <div className="price">
+                        ${displayTotal.toFixed(2)}
+                        <small>total</small>
+                      </div>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className="cta-button"
+                    onClick={addCurrentOrderToBag}
+                  >
+                    Add to bag
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="cta-button"
-                  onClick={addCurrentOrderToBag}
-                >
-                  Add to bag
-                </button>
+                <div className="confirmation">{confirmationText}</div>
+                {orderError ? <p className="order-error" role="alert">{orderError}</p> : null}
+                {checkoutMessage ? <p className="checkout-message" role="status">{checkoutMessage}</p> : null}
+                {cartItems.length > 0 ? (
+                  <div className="cart-panel">
+                    <div className="cart-heading">
+                      <strong>Your bag ({cartCount})</strong>
+                      <button type="button" className="undo-button" onClick={() => setCartOpen((open) => !open)}>
+                        {cartOpen ? "Hide review" : "Review bag"}
+                      </button>
+                    </div>
+                    {cartOpen ? (
+                      <>
+                        <ul className="cart-list">
+                          {cartItems.map((item) => (
+                            <li key={item.id} className="cart-item">
+                              <div>
+                                <strong>{item.quantity} × {item.size} sub</strong>
+                                <p>{item.summary}</p>
+                              </div>
+                              <div>
+                                <button type="button" className="undo-button" onClick={() => editCartItem(item)}>Edit</button>
+                                <button type="button" className="cart-remove" onClick={() => removeCartItem(item.id)}>
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="checkout-grid">
+                          <input
+                            className="checkout-input"
+                            aria-label="Pickup name"
+                            value={pickupName}
+                            onChange={(event) => setPickupName(event.target.value)}
+                            placeholder="Pickup name"
+                          />
+                          <input
+                            className="checkout-input"
+                            aria-label="Pickup time"
+                            value={pickupTime}
+                            onChange={(event) => setPickupTime(event.target.value)}
+                            placeholder="Pickup time"
+                          />
+                        </div>
+                        <div className="cart-total-row">
+                          <span>Total ${cartTotal.toFixed(2)}</span>
+                          <button type="button" className="checkout-button" onClick={completeCheckout}>
+                            Confirm pickup
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-              <div className="confirmation">{confirmationText}</div>
-              {orderError ? <p className="order-error" role="alert">{orderError}</p> : null}
-              {checkoutMessage ? <p className="checkout-message" role="status">{checkoutMessage}</p> : null}
-              {cartItems.length > 0 ? (
-                <div className="cart-panel">
-                  <div className="cart-heading">
-                    <strong>Your bag ({cartCount})</strong>
-                    <button type="button" className="undo-button" onClick={() => setCartOpen((open) => !open)}>
-                      {cartOpen ? "Hide review" : "Review bag"}
-                    </button>
-                  </div>
-                  {cartOpen ? (
-                    <>
-                      <ul className="cart-list">
-                        {cartItems.map((item) => (
-                          <li key={item.id} className="cart-item">
-                            <div>
-                              <strong>{item.quantity} × {item.size} sub</strong>
-                              <p>{item.summary}</p>
-                            </div>
-                            <div>
-                              <button type="button" className="undo-button" onClick={() => editCartItem(item)}>Edit</button>
-                              <button type="button" className="cart-remove" onClick={() => removeCartItem(item.id)}>
-                                Remove
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="checkout-grid">
-                        <input
-                          className="checkout-input"
-                          aria-label="Pickup name"
-                          value={pickupName}
-                          onChange={(event) => setPickupName(event.target.value)}
-                          placeholder="Pickup name"
-                        />
-                        <input
-                          className="checkout-input"
-                          aria-label="Pickup time"
-                          value={pickupTime}
-                          onChange={(event) => setPickupTime(event.target.value)}
-                          placeholder="Pickup time"
-                        />
-                      </div>
-                      <div className="cart-total-row">
-                        <span>Total ${cartTotal.toFixed(2)}</span>
-                        <button type="button" className="checkout-button" onClick={completeCheckout}>
-                          Confirm pickup
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

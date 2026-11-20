@@ -19,7 +19,11 @@ def session_state(session_id, session):
 
 
 def handle_chat(payload):
-    message = payload.get("message", "")
+    if "audio" in payload:
+        message = transcribe_audio(payload["audio"], payload.get("mime_type")) #call google api
+    else:
+        message = payload.get("message", "")
+    
     if not isinstance(message, str) or not message.strip():
         return 400, {"error": "\"message\" must be a non-empty string."}
 
@@ -44,3 +48,7 @@ def handle_session(query):
 
     session_id, session = get_session(session_id)
     return 200, session_state(session_id, session)
+
+def transcribe_audio(audio, mime_type):
+    raise NotImplementedError("Speech-to-text is not set up yet")
+

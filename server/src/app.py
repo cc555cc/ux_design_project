@@ -12,8 +12,8 @@ from routes.menu import handle_menu
 from routes.orders import handle_list_orders
 
 
-HOST = "127.0.0.1"
-PORT = int(os.environ.get("SANDWICH_API_PORT", "8010"))
+HOST = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
+PORT = PORT = int(os.environ.get("PORT") or os.environ.get("SANDWICH_API_PORT", "8010"))
 
 #(method, path) -> handler(payload or query) returning (status code, response body)
 ROUTES = {

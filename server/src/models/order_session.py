@@ -33,6 +33,7 @@ def new_session():
         "pending": None,
         "order": new_order(),
         "order_id": None,
+        "account_id": None,
         "last_accessed": time.monotonic(),
     }
 
@@ -67,7 +68,9 @@ def reset_session(session_id):
 
 #start a fresh order inside an existing session, keeping the same session object
 def start_new_order(session):
+    account_id = session.get("account_id")
     session.update(new_session())
+    session["account_id"] = account_id
     session["status"] = "building"
 
 

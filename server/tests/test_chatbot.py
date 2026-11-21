@@ -211,5 +211,22 @@ class SideQuestionTest(ChatbotTestCase):
         self.assertIn("Pepper Jack", reply)
 
 
+class AccountOrderTest(ChatbotTestCase):
+    def test_saved_order_includes_account_id_when_logged_in(self):
+        self.session["account_id"] = "acct-demo"
+        self.say("footlong italian turkey swiss lettuce mayo under Demo at noon")
+        self.say("yes")
+
+        saved = order_store.load_orders(self.order_file)
+        self.assertEqual(saved[0]["account_id"], "acct-demo")
+
+    def test_saved_order_omits_account_id_when_logged_out(self):
+        self.say("footlong italian turkey swiss lettuce mayo under Guest at noon")
+        self.say("yes")
+
+        saved = order_store.load_orders(self.order_file)
+        self.assertNotIn("account_id", saved[0])
+
+
 if __name__ == "__main__":
     unittest.main()

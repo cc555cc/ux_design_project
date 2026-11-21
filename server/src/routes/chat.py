@@ -8,7 +8,7 @@ from models.order_session import get_session, reset_session
 
 #the state returned with every chat response, the frontend draws the sandwich from "order"
 def session_state(session_id, session):
-    return {
+    state = {
         "session_id": session_id,
         "status": session["status"],
         "step": session["pending"],
@@ -16,6 +16,9 @@ def session_state(session_id, session):
         "total": calculate_total(session["order"]),
         "order_id": session["order_id"],
     }
+    if session.get("account_id"):
+        state["account_id"] = session["account_id"]
+    return state
 
 
 def handle_chat(payload):
@@ -28,6 +31,8 @@ def handle_chat(payload):
         return 400, {"error": "\"message\" must be a non-empty string."}
 
     session_id, session = get_session(payload.get("session_id"))
+    account_id = payload.get("account_id")
+    session["account_id"] = account_id.strip() if isinstance(account_id, str) and account_id.strip() else None
     reply = generate_response(message, session_id)
 
     return 200, {"reply": reply, **session_state(session_id, session)}
@@ -36,6 +41,8 @@ def handle_chat(payload):
 def handle_reset(payload):
     session_id, _ = get_session(payload.get("session_id"))
     session = reset_session(session_id)
+    account_id = payload.get("account_id")
+    session["account_id"] = account_id.strip() if isinstance(account_id, str) and account_id.strip() else None
     reply = random.choice(BUSINESS_INFO["greeting"]["responses"])
 
     return 200, {"reply": reply, **session_state(session_id, session)}

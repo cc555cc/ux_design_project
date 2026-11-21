@@ -21,11 +21,20 @@ export type ChatResponse = {
 }
 
 //take message and send to chatbot living in server//
-export async function sendChat(message: string | Blob, sessionId?: string): Promise<ChatResponse> {
+export async function sendChat(
+  message: string | Blob,
+  sessionId?: string,
+  accountId?: string
+): Promise<ChatResponse> {
   //check message type first//
   const body = typeof message === "string"
-    ?{ message: message, session_id: sessionId }
-    :{ audio: await blobToBase64(message), mime_type: message.type, session_id: sessionId }
+    ? { message: message, session_id: sessionId, ...(accountId ? { account_id: accountId } : {}) }
+    : {
+        audio: await blobToBase64(message),
+        mime_type: message.type,
+        session_id: sessionId,
+        ...(accountId ? { account_id: accountId } : {}),
+      }
 
   const response = await fetch("/api/chat", {
     method: "POST",

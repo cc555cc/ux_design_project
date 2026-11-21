@@ -540,7 +540,13 @@ def build_order_review(order):
 def place_order(session):
     order = session["order"]
     sandwich = {key: value for key, value in order.items() if key not in {"name", "pickup_time"}}
-    saved_order = save_order(order["name"], order["pickup_time"], sandwich, calculate_total(order))
+    saved_order = save_order(
+        order["name"],
+        order["pickup_time"],
+        sandwich,
+        calculate_total(order),
+        session.get("account_id"),
+    )
 
     session["status"] = "complete"
     session["pending"] = None

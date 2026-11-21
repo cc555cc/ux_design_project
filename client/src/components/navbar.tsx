@@ -1,7 +1,7 @@
 import store_logo from "../assets/logo.svg"
 import { useState, useEffect, useRef } from 'react'
 
-export type Section = "home" | "order" | "about" | "account"
+export type Section = "home" | "order" | "about" | "account" | "login"
 
 type NavbarButtonProps = {
   text: string
@@ -102,7 +102,7 @@ function Navbar({currentSection}: {currentSection: Section}) {
                 className="flex h-full items-center pl-6"
             >
                 <span className={`flex h-11 w-11 items-center justify-center rounded-full bg-gray-200 text-gray-700 transition hover:bg-white ${
-                    currentSection === "account" ? "ring-2 ring-red-500" : ""
+                    currentSection === "account" || currentSection === "login" ? "ring-2 ring-red-500" : ""
                 }`}>
 
                     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">

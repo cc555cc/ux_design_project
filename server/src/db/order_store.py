@@ -16,7 +16,7 @@ ORDER_DATABASE_DIR = BASE_DIR / "data"
 ORDER_FILE = ORDER_DATABASE_DIR / "orders.jsonl"
 
 
-def save_order(name, pickup_time, sandwich, total=0, file_path=ORDER_FILE):
+def save_order(name, pickup_time, sandwich, total=0, account_id=None, file_path=ORDER_FILE):
     ORDER_DATABASE_DIR.mkdir(parents=True, exist_ok=True)
     order = {
         "id": uuid.uuid4().hex[:8],
@@ -26,6 +26,8 @@ def save_order(name, pickup_time, sandwich, total=0, file_path=ORDER_FILE):
         "total": total,
         "created_at": datetime.now().isoformat(timespec="seconds"),
     }
+    if account_id:
+        order["account_id"] = account_id
 
     with open(file_path, "a", encoding="utf-8") as order_file:
         order_file.write(json.dumps(order) + "\n")

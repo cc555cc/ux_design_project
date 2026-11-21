@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useAuth } from "../hook/useAuth"
+import {
+  CART_STORAGE_KEY,
+  DRAFT_STORAGE_KEY,
+  saveCompletedOrder,
+} from "../data/orderHistory"
 import assemblecounter from "../assets/scene-deli-counter.png"
 import woodenPlate from "../assets/board-oak-v2.png"
 import breadTopLayer from "../assets/sandwich_layer/layer-bread-top.png"
@@ -124,6 +130,8 @@ type ChatbotResponse = {
   step: string | null
   total: number
   order: ChatbotOrderState
+  order_id?: string | null
+  account_id?: string | null
   error?: string
 }
 
@@ -150,6 +158,7 @@ type SpeechWindow = Window & {
 
 type CartItem = {
   id: string
+  account_id?: string
   summary: string
   size: string
   quantity: number
@@ -157,8 +166,8 @@ type CartItem = {
   toppingAmounts: ToppingAmounts
 }
 
-const draftStorageKey = "long-story-order-draft-v1"
-const cartStorageKey = "long-story-cart-v1"
+const draftStorageKey = DRAFT_STORAGE_KEY
+const cartStorageKey = CART_STORAGE_KEY
 
 const serverToLocalNameMap: Record<string, string> = {
   "whole wheat": "Wheat",
@@ -227,6 +236,7 @@ function titleForCategory(category: ProductOption): string {
 
 function OrderSection() {
   const [activeCategory, setActiveCategory] = useState<ProductOption>("Bread")
+  const user = useAuth((state) => state.user)
   const [toppingAmounts, setToppingAmounts] = useState<ToppingAmounts>(() => ({ ...emptyToppingAmounts }))
   const [sandwichSize, setSandwichSize] = useState("6-inch")
   const [quantity, setQuantity] = useState(1)
@@ -248,6 +258,7 @@ function OrderSection() {
   const [pickupName, setPickupName] = useState("")
   const [pickupTime, setPickupTime] = useState("")
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
   const initRef = useRef(false)
   const recognitionRef = useRef<RecognitionLike | null>(null)
 
@@ -391,6 +402,31 @@ function OrderSection() {
       if (response.order.size) setSandwichSize(response.order.size)
       if (response.order.name) setPickupName(response.order.name)
       if (response.order.pickup_time) setPickupTime(response.order.pickup_time)
+
+      if (response.status === "complete" && response.order_id) {
+        const summary = mappedSelections.length > 0 ? mappedSelections.join(", ") : "Custom sub"
+        const total = typeof response.total === "number" ? response.total : basePrice
+        saveCompletedOrder({
+          id: response.order_id,
+          ...(user ? { account_id: user.id } : {}),
+          pickupName: response.order.name ?? pickupName,
+          pickupTime: response.order.pickup_time ?? pickupTime,
+          total,
+          createdAt: new Date().toISOString(),
+          source: "chat",
+          items: [
+            {
+              id: `item-${response.order_id}`,
+              ...(user ? { account_id: user.id } : {}),
+              summary,
+              size: response.order.size ?? sandwichSize,
+              quantity: 1,
+              total,
+              toppingAmounts: nextAmounts,
+            },
+          ],
+        })
+      }
     }
 
     if (response.step && stepToCategoryMap[response.step]) {
@@ -405,6 +441,7 @@ function OrderSection() {
     try {
       const payload: Record<string, string> = {}
       if (chatSessionId) payload.session_id = chatSessionId
+      if (user) payload.account_id = user.id
 
       const response = await fetch("/api/chat/reset", {
         method: "POST",
@@ -453,7 +490,11 @@ function OrderSection() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, session_id: chatSessionId ?? undefined }),
+        body: JSON.stringify({
+          message,
+          session_id: chatSessionId ?? undefined,
+          ...(user ? { account_id: user.id } : {}),
+        }),
       })
 
       const data = (await response.json()) as ChatbotResponse
@@ -514,6 +555,7 @@ function OrderSection() {
       quantity,
       total: displayTotal,
       toppingAmounts: { ...toppingAmounts },
+      ...(user ? { account_id: user.id } : {}),
     }
     setCartItems((current) => [...current, item])
     setAddedCount((count) => count + quantity)
@@ -601,7 +643,24 @@ function OrderSection() {
       return
     }
 
-    const confirmation = `Order confirmed for ${pickupName.trim()} at ${pickupTime.trim()}.`
+    const trimmedName = pickupName.trim()
+    const trimmedTime = pickupTime.trim()
+    saveCompletedOrder({
+      id: `order-${Date.now()}`,
+      ...(user ? { account_id: user.id } : {}),
+      pickupName: trimmedName,
+      pickupTime: trimmedTime,
+      items: cartItems.map((item) => ({
+        ...item,
+        ...(user ? { account_id: user.id } : {}),
+        toppingAmounts: { ...item.toppingAmounts },
+      })),
+      total: cartTotal,
+      createdAt: new Date().toISOString(),
+      source: "manual",
+    })
+
+    const confirmation = `Order confirmed for ${trimmedName} at ${trimmedTime}.`
     setCartItems([])
     setAddedCount(0)
     setCartOpen(false)
@@ -624,47 +683,51 @@ function OrderSection() {
     }
 
     const restore = async () => {
-      const savedDraft = localStorage.getItem(draftStorageKey)
-      if (!savedDraft) {
-        await resetChatSession()
-        return
-      }
-
       try {
-        const draft = JSON.parse(savedDraft) as {
-          toppingAmounts?: ToppingAmounts
-          sandwichSize?: string
-          quantity?: number
-          chatMessages?: ChatMessage[]
-          chatSessionId?: string | null
-          pickupName?: string
-          pickupTime?: string
+        const savedDraft = localStorage.getItem(draftStorageKey)
+        if (!savedDraft) {
+          await resetChatSession()
+          return
         }
-        setToppingAmounts({ ...emptyToppingAmounts, ...(draft.toppingAmounts ?? {}) })
-        setSandwichSize(draft.sandwichSize ?? "6-inch")
-        setQuantity(Math.max(1, draft.quantity ?? 1))
-        setChatMessages(Array.isArray(draft.chatMessages) ? draft.chatMessages : [])
-        setChatSessionId(draft.chatSessionId ?? null)
-        setPickupName(draft.pickupName ?? "")
-        setPickupTime(draft.pickupTime ?? "")
 
-        if (draft.chatSessionId) {
-          const response = await fetch(`/api/session?session_id=${encodeURIComponent(draft.chatSessionId)}`)
-          if (response.ok) {
-            const state = (await response.json()) as ChatbotResponse
-            if (state.status === "idle") {
-              setChatSessionId(state.session_id)
-              setChatError("The assistant session expired. Your local draft was preserved, so you can continue.")
-            } else {
-              applyChatState(state)
-            }
-          } else {
-            await resetChatSession()
+        try {
+          const draft = JSON.parse(savedDraft) as {
+            toppingAmounts?: ToppingAmounts
+            sandwichSize?: string
+            quantity?: number
+            chatMessages?: ChatMessage[]
+            chatSessionId?: string | null
+            pickupName?: string
+            pickupTime?: string
           }
+          setToppingAmounts({ ...emptyToppingAmounts, ...(draft.toppingAmounts ?? {}) })
+          setSandwichSize(draft.sandwichSize ?? "6-inch")
+          setQuantity(Math.max(1, draft.quantity ?? 1))
+          setChatMessages(Array.isArray(draft.chatMessages) ? draft.chatMessages : [])
+          setChatSessionId(draft.chatSessionId ?? null)
+          setPickupName(draft.pickupName ?? "")
+          setPickupTime(draft.pickupTime ?? "")
+
+          if (draft.chatSessionId) {
+            const response = await fetch(`/api/session?session_id=${encodeURIComponent(draft.chatSessionId)}`)
+            if (response.ok) {
+              const state = (await response.json()) as ChatbotResponse
+              if (state.status === "idle") {
+                setChatSessionId(state.session_id)
+                setChatError("The assistant session expired. Your local draft was preserved, so you can continue.")
+              } else {
+                applyChatState(state)
+              }
+            } else {
+              await resetChatSession()
+            }
+          }
+        } catch {
+          localStorage.removeItem(draftStorageKey)
+          await resetChatSession()
         }
-      } catch {
-        localStorage.removeItem(draftStorageKey)
-        await resetChatSession()
+      } finally {
+        setIsHydrated(true)
       }
     }
 
@@ -672,8 +735,9 @@ function OrderSection() {
   }, [])
 
   useEffect(() => {
-    if (!initRef.current) return
+    if (!isHydrated) return
     const draft = {
+      ...(user ? { account_id: user.id } : {}),
       toppingAmounts,
       sandwichSize,
       quantity,
@@ -683,11 +747,12 @@ function OrderSection() {
       pickupTime,
     }
     localStorage.setItem(draftStorageKey, JSON.stringify(draft))
-  }, [toppingAmounts, sandwichSize, quantity, chatMessages, chatSessionId, pickupName, pickupTime])
+  }, [isHydrated, user, toppingAmounts, sandwichSize, quantity, chatMessages, chatSessionId, pickupName, pickupTime])
 
   useEffect(() => {
+    if (!isHydrated) return
     localStorage.setItem(cartStorageKey, JSON.stringify(cartItems))
-  }, [cartItems])
+  }, [isHydrated, cartItems])
 
   useEffect(() => {
     return () => {

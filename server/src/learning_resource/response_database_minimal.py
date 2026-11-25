@@ -89,6 +89,13 @@ INTENT_KEYWORDS = {
             "special",
             "specials",
         ],
+        "delivery": [
+            "delivery",
+            "deliver",
+            "delivers",
+            "delivered",
+            "delivering",
+        ],
     },
 }
 
@@ -217,17 +224,14 @@ NUMBER_WORDS = [
     "twenty",
 ]
 
-#ingredient catalog, grouped by build step. aliases are matched word-for-word against the query,
-#longer aliases win over shorter ones (e.g. "pepper jack" before "pepper")
+#ingredient catalog, grouped by build step. must list the same items, with the same names, as toppingOptions
+#in client/src/sections/order.tsx. aliases are matched word-for-word against the query, longer aliases win over
+#shorter ones (e.g. "roast beef" before "beef")
 MENU_ITEMS = {
     "bread": [
-        {"name": "Italian", "aliases": ["italian", "white", "italian bread", "white bread"], "price": 0},
-        {"name": "Whole Wheat", "aliases": ["whole wheat", "wheat", "brown"], "price": 0},
-        {"name": "Italian Herbs and Cheese", "aliases": ["italian herbs and cheese", "herbs and cheese", "herb and cheese", "italian herb", "herb"], "price": 0.50},
+        {"name": "Italian Herbs", "aliases": ["italian herbs", "italian herb", "italian herbs and cheese", "italian", "italian bread", "herbs", "herb"], "price": 0.50},
+        {"name": "Wheat", "aliases": ["wheat", "whole wheat", "brown", "brown bread"], "price": 0},
         {"name": "Honey Oat", "aliases": ["honey oat", "oat"], "price": 0.50},
-        {"name": "Multigrain", "aliases": ["multigrain", "multi grain", "multi-grain"], "price": 0.50},
-        {"name": "Flatbread", "aliases": ["flatbread", "flat bread"], "price": 0.50},
-        {"name": "Wrap", "aliases": ["wrap", "tortilla"], "price": 0},
     ],
     "size": [
         {"name": "6-inch", "aliases": ["6-inch", "6 inch", "six inch", "six-inch", "6in", "half"], "price": 6.99},
@@ -235,47 +239,42 @@ MENU_ITEMS = {
     ],
     "protein": [
         {"name": "Turkey", "aliases": ["turkey", "turkey breast"], "price": 0},
-        {"name": "Ham", "aliases": ["ham", "black forest ham"], "price": 0},
-        {"name": "Chicken", "aliases": ["chicken", "grilled chicken", "chicken breast"], "price": 0.75},
         {"name": "Roast Beef", "aliases": ["roast beef", "beef"], "price": 1.00},
-        {"name": "Steak", "aliases": ["steak"], "price": 1.25},
-        {"name": "Tuna", "aliases": ["tuna"], "price": 0.50},
-        {"name": "Meatball", "aliases": ["meatball", "meatballs"], "price": 0.50},
-        {"name": "Salami", "aliases": ["salami", "pepperoni"], "price": 0.50},
-        {"name": "Veggie Patty", "aliases": ["veggie patty", "veggie burger", "plant based patty", "plant-based patty"], "price": 0.75},
+        {"name": "Chicken", "aliases": ["chicken", "grilled chicken", "chicken breast"], "price": 0.75},
     ],
     "cheese": [
-        {"name": "American", "aliases": ["american", "american cheese"], "price": 0},
         {"name": "Cheddar", "aliases": ["cheddar", "cheddar cheese"], "price": 0},
         {"name": "Swiss", "aliases": ["swiss", "swiss cheese"], "price": 0},
         {"name": "Provolone", "aliases": ["provolone", "provolone cheese"], "price": 0},
-        {"name": "Pepper Jack", "aliases": ["pepper jack", "pepperjack", "monterey jack"], "price": 0},
-        {"name": "Mozzarella", "aliases": ["mozzarella", "mozzarella cheese", "mozz"], "price": 0},
     ],
     "veggies": [
         {"name": "Lettuce", "aliases": ["lettuce"], "price": 0},
         {"name": "Tomato", "aliases": ["tomato", "tomatoes"], "price": 0},
         {"name": "Cucumber", "aliases": ["cucumber", "cucumbers"], "price": 0},
-        {"name": "Red Onion", "aliases": ["red onion", "red onions", "onion", "onions"], "price": 0},
-        {"name": "Green Pepper", "aliases": ["green pepper", "green peppers", "pepper", "peppers", "bell pepper", "bell peppers"], "price": 0},
-        {"name": "Spinach", "aliases": ["spinach"], "price": 0},
-        {"name": "Pickles", "aliases": ["pickle", "pickles"], "price": 0},
-        {"name": "Olives", "aliases": ["olive", "olives", "black olives"], "price": 0},
-        {"name": "Jalapenos", "aliases": ["jalapeno", "jalapenos", "jalapeño", "jalapeños"], "price": 0},
-        {"name": "Banana Peppers", "aliases": ["banana pepper", "banana peppers"], "price": 0},
+        {"name": "Red onion", "aliases": ["red onion", "red onions", "onion", "onions"], "price": 0},
+        {"name": "Green peppers", "aliases": ["green pepper", "green peppers", "pepper", "peppers", "bell pepper", "bell peppers"], "price": 0},
+        {"name": "Black olives", "aliases": ["black olive", "black olives", "olive", "olives"], "price": 0},
     ],
     "sauce": [
         {"name": "Mayo", "aliases": ["mayo", "mayonnaise"], "price": 0},
-        {"name": "Mustard", "aliases": ["mustard", "yellow mustard"], "price": 0},
-        {"name": "Honey Mustard", "aliases": ["honey mustard"], "price": 0},
+        {"name": "Chipotle", "aliases": ["chipotle", "chipotle sauce"], "price": 0},
         {"name": "Ranch", "aliases": ["ranch"], "price": 0},
-        {"name": "Chipotle", "aliases": ["chipotle", "chipotle southwest", "southwest"], "price": 0},
-        {"name": "BBQ", "aliases": ["bbq", "barbecue", "barbeque", "bbq sauce"], "price": 0},
-        {"name": "Sweet Onion", "aliases": ["sweet onion", "sweet onion sauce", "teriyaki"], "price": 0},
-        {"name": "Oil and Vinegar", "aliases": ["oil and vinegar", "oil", "vinegar"], "price": 0},
-        {"name": "Hot Sauce", "aliases": ["hot sauce", "sriracha", "buffalo"], "price": 0},
     ],
 }
+
+#common sub ingredients the shop does not have, so the chatbot can say so instead of not understanding. they also stop
+#a longer name from matching part of a real item, e.g. "banana peppers" is not "Green peppers"
+UNAVAILABLE_ITEMS = {
+    "bread": ["white bread", "multigrain", "flatbread", "wrap", "tortilla", "sourdough", "rye", "gluten free bread"],
+    "protein": ["ham", "steak", "tuna", "meatball", "meatballs", "salami", "pepperoni", "bacon", "veggie patty", "falafel"],
+    "cheese": ["american cheese", "american", "pepper jack", "pepperjack", "monterey jack", "mozzarella", "feta", "parmesan"],
+    "veggies": ["spinach", "pickle", "pickles", "jalapeno", "jalapenos", "jalapeño", "jalapeños", "banana pepper", "banana peppers", "avocado", "mushrooms"],
+    "sauce": ["mustard", "yellow mustard", "honey mustard", "bbq", "bbq sauce", "barbecue sauce", "barbecue", "sweet onion", "sweet onion sauce", "oil and vinegar", "olive oil", "vinegar", "hot sauce", "sriracha", "ketchup", "buffalo sauce", "teriyaki"],
+}
+
+#pickup is limited to opening hours, in minutes since midnight (9 AM to 9 PM), same as the order page
+PICKUP_OPENS = 9 * 60
+PICKUP_CLOSES = 21 * 60
 
 #words that describe a whole ingredient category, used for "no cheese", "change the bread to ..." etc.
 ORDER_KEYWORDS = {
@@ -301,29 +300,31 @@ ORDER_KEYWORDS = {
 BUSINESS_INFO = {
     "greeting": {
         "responses": [
-            "Hello! Welcome to the sub shop. You can tell me your whole sandwich at once, or say \"start an order\" and I'll walk you through it.",
-            "Hi there! Ready to build a sub? Tell me everything you want in one go, or we can do it step by step starting with the bread.",
-            "Hey! Welcome in. I can take your sandwich order, tell you our hours, or show you the ingredients.",
+            "Hello! Welcome to Long Story Sub. You can tell me your whole sandwich at once, or say \"start an order\" and I'll walk you through it.",
+            "Hi there! Ready to build your sub? Tell me everything you want in one go, or we can do it step by step starting with the bread.",
+            "Hey! Welcome to Long Story Sub. I can take your sub order, show you the ingredients, or tell you our hours and locations.",
         ],
     },
     "operation": {
-        "response": "We are open from 9 AM to 9 PM every day, and the shop is located at 123 Main Street.",
+        "response": "We are open from 9 AM to 9 PM every day. You can find us Downtown (Nathan Phillips Square), in Midtown (Yonge & Eglinton) and on the Danforth (Danforth & Pape). The map is on our About Us page.",
         "details": {
-            "address": "The shop is located at 123 Main Street.",
+            "address": "You can find us Downtown (Nathan Phillips Square), in Midtown (Yonge & Eglinton) and on the Danforth (Danforth & Pape).",
             "time": "We are open from 9 AM to 9 PM every day.",
         },
     },
     "contact": {
-        "response": "You can reach us by phone at (555) 123-4567 or by email at hello@subshop.com.",
+        "response": "You can reach us by phone at (555) 123-4567 or by email at hello@longstorysub.com.",
         "details": {
             "number": "You can call us at (555) 123-4567.",
-            "email": "You can email us at hello@subshop.com.",
+            "email": "You can email us at hello@longstorysub.com.",
         },
     },
     "service": {
         "details": {
-            "order": "We make subs to order for pickup. Tell me your bread, size, meat, cheese, veggies and sauce, or start with the bread and I'll guide you.",
+            "order": "I can take your sub order here for pickup. Tell me your bread, size, meat, cheese, veggies and sauce, or start with the bread and I'll guide you.",
             "menu": "Every sub is built from bread, meat, cheese, veggies and sauce. Ask me to start an order whenever you're ready.",
+            "delivery": "We deliver within 5 km of the shop, from 9 AM to 9 PM every day. Orders I take here in chat are for pickup.",
+            "pickup_only": "Just so you know, orders I take here in chat are for pickup.",
         },
     },
 }
@@ -349,7 +350,7 @@ RESPONSE_DATABASE = [
         "intent": "hours",
         "patterns": ["hours", "opening hours", "when are you open", "what time do you open"],
         "responses": [
-            "We are open from 9 AM to 5 PM, Monday to Friday.",
+            "We are open from 9 AM to 9 PM every day.",
         ],
     },
     {

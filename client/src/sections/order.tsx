@@ -17,6 +17,16 @@ import onionLayer from "../assets/sandwich_layer/layer-onion.png"
 import peppersLayer from "../assets/sandwich_layer/layer-peppers.png"
 import tomatoLayer from "../assets/sandwich_layer/layer-tomato.png"
 import turkeyLayer from "../assets/sandwich_layer/layer-turkey.png"
+import chickenLayer from "../assets/sandwich_layer/chicken.png"
+import roastBeefLayer from "../assets/sandwich_layer/roast-beef.png"
+import swissLayer from "../assets/sandwich_layer/swiss-cheese.png"
+import provoloneLayer from "../assets/sandwich_layer/provolone-cheese.png"
+import italianHerbsLayer from "../assets/sandwich_layer/italian-herbs-bread.png"
+import wheatLayer from "../assets/sandwich_layer/wheat-bread.png"
+import honeyOatLayer from "../assets/sandwich_layer/honey-oat-bread.png"
+import mayoBowl from "../assets/sandwich_layer/mayo-side-view.png"
+import chipotleBowl from "../assets/sandwich_layer/chipotle-side-view.png"
+import ranchBowl from "../assets/sandwich_layer/ranch-side-view.png"
 import cheesePiece from "../assets/ingredients/piece-cheese.png"
 import cucumberPiece from "../assets/ingredients/piece-cucumber.png"
 import lettucePiece from "../assets/ingredients/piece-lettuce.png"
@@ -25,6 +35,16 @@ import onionPiece from "../assets/ingredients/piece-onion.png"
 import peppersPiece from "../assets/ingredients/piece-peppers.png"
 import tomatoPiece from "../assets/ingredients/piece-tomato.png"
 import turkeyPiece from "../assets/ingredients/piece-turkey.png"
+import italianHerbsIcon from "../assets/ingredients/italian-herbs-bread.png"
+import wheatIcon from "../assets/ingredients/wheat-bread.png"
+import honeyOatIcon from "../assets/ingredients/honey-oat-bread.png"
+import roastBeefIcon from "../assets/ingredients/icon-roast-beef.png"
+import chickenIcon from "../assets/ingredients/icon-chicken.png"
+import swissIcon from "../assets/ingredients/icon-swiss-cheese.png"
+import provoloneIcon from "../assets/ingredients/icon-provolone-cheese.png"
+import mayoPiece from "../assets/ingredients/mayo-sauce.png"
+import chipotlePiece from "../assets/ingredients/chipotle-sauce.png"
+import ranchPiece from "../assets/ingredients/ranch-sauce.png"
 import staffHelper from "../assets/sandwich-shop-employee-male_transparent.png"
 
 const productOptions = ["Bread", "Protein", "Cheese", "Veggies", "Sauce"] as const
@@ -37,29 +57,34 @@ type ToppingOption = {
   image: string
   /** transparent cut-out shown as the picker icon (falls back to `image`) */
   icon?: string
-  /** transparent 1536×512 side-view layer for the sandwich preview (falls back to a labelled pill) */
+  /** set when `icon` is a photo on a light background instead of a cut-out: the background is blended into the
+      card, and this is how much the photo is enlarged so the food fills the card like the cut-outs do */
+  photoZoom?: number
+  /** transparent side-view layer for the sandwich preview; its measurements go in `layerBoxes` (falls back to a labelled pill) */
   layer?: string
+  /** transparent picture shown on the counter beside the sandwich instead of in the stack (sauces) */
+  side?: string
 }
 
 const toppingOptions: ToppingOption[] = [
-  { name: "Italian Herbs", color: "#dcbf86", category: "Bread", image: "/toppings/italian-herbs.jpg" },
-  { name: "Wheat", color: "#c28f4d", category: "Bread", image: "/toppings/wheat.jpg" },
-  { name: "Honey Oat", color: "#debb76", category: "Bread", image: "/toppings/honey-oat.jpg" },
+  { name: "Italian Herbs", color: "#dcbf86", category: "Bread", image: "/toppings/italian-herbs.jpg", icon: italianHerbsIcon, photoZoom: 1.15, layer: italianHerbsLayer },
+  { name: "Wheat", color: "#c28f4d", category: "Bread", image: "/toppings/wheat.jpg", icon: wheatIcon, photoZoom: 1.15, layer: wheatLayer },
+  { name: "Honey Oat", color: "#debb76", category: "Bread", image: "/toppings/honey-oat.jpg", icon: honeyOatIcon, photoZoom: 1.15, layer: honeyOatLayer },
   { name: "Turkey", color: "#cc9d6d", category: "Protein", image: "/toppings/turkey.jpg", icon: turkeyPiece, layer: turkeyLayer },
-  { name: "Roast Beef", color: "#8c4f3d", category: "Protein", image: "/toppings/roast-beef.jpg" },
-  { name: "Chicken", color: "#d4a772", category: "Protein", image: "/toppings/chicken.jpg" },
+  { name: "Roast Beef", color: "#8c4f3d", category: "Protein", image: "/toppings/roast-beef.jpg", icon: roastBeefIcon, photoZoom: 1.5, layer: roastBeefLayer },
+  { name: "Chicken", color: "#d4a772", category: "Protein", image: "/toppings/chicken.jpg", icon: chickenIcon, photoZoom: 1.5, layer: chickenLayer },
   { name: "Cheddar", color: "#e7b839", category: "Cheese", image: "/toppings/cheddar.jpg", icon: cheesePiece, layer: cheeseLayer },
-  { name: "Swiss", color: "#f1da78", category: "Cheese", image: "/toppings/swiss.jpg" },
-  { name: "Provolone", color: "#f2dd9c", category: "Cheese", image: "/toppings/provolone.jpg" },
+  { name: "Swiss", color: "#f1da78", category: "Cheese", image: "/toppings/swiss.jpg", icon: swissIcon, photoZoom: 1.5, layer: swissLayer },
+  { name: "Provolone", color: "#f2dd9c", category: "Cheese", image: "/toppings/provolone.jpg", icon: provoloneIcon, photoZoom: 1.4, layer: provoloneLayer },
   { name: "Lettuce", color: "#7bbf68", category: "Veggies", image: "/toppings/lettuce.jpg", icon: lettucePiece, layer: lettuceLayer },
   { name: "Tomato", color: "#d7482d", category: "Veggies", image: "/toppings/tomato.jpg", icon: tomatoPiece, layer: tomatoLayer },
   { name: "Cucumber", color: "#8dcf64", category: "Veggies", image: "/toppings/cucumber.jpg", icon: cucumberPiece, layer: cucumberLayer },
   { name: "Red onion", color: "#d26471", category: "Veggies", image: "/toppings/red-onion.jpg", icon: onionPiece, layer: onionLayer },
   { name: "Green peppers", color: "#356a38", category: "Veggies", image: "/toppings/green-peppers.jpg", icon: peppersPiece, layer: peppersLayer },
   { name: "Black olives", color: "#393939", category: "Veggies", image: "/toppings/black-olives.jpg", icon: olivesPiece, layer: olivesLayer },
-  { name: "Mayo", color: "#f5e8bf", category: "Sauce", image: "/toppings/mayo.jpg" },
-  { name: "Chipotle", color: "#b5573f", category: "Sauce", image: "/toppings/chipotle.jpg" },
-  { name: "Ranch", color: "#e7e1cf", category: "Sauce", image: "/toppings/ranch.jpg" },
+  { name: "Mayo", color: "#f5e8bf", category: "Sauce", image: "/toppings/mayo.jpg", icon: mayoPiece, side: mayoBowl },
+  { name: "Chipotle", color: "#b5573f", category: "Sauce", image: "/toppings/chipotle.jpg", icon: chipotlePiece, side: chipotleBowl },
+  { name: "Ranch", color: "#e7e1cf", category: "Sauce", image: "/toppings/ranch.jpg", icon: ranchPiece, side: ranchBowl },
 ]
 
 const basePrice = 9.5
@@ -74,32 +99,108 @@ type PreviewLayer = { option: ToppingOption; amount: number }
 
 /** how much of each filling peeks out below the layer above it (0–1 of its visible height) */
 const layerReveal = 0.3
-/** measured top/bottom edge of the visible food in each 1536×512 layer PNG, in image pixels */
-const layerBands = new Map<string, [top: number, bottom: number]>([
-  [turkeyLayer, [160, 356]],
-  [cheeseLayer, [152, 340]],
-  [lettuceLayer, [152, 348]],
-  [tomatoLayer, [152, 364]],
-  [cucumberLayer, [172, 332]],
-  [onionLayer, [148, 320]],
-  [peppersLayer, [172, 336]],
-  [olivesLayer, [176, 332]],
+/** a layer PNG's size, the top/bottom edge of its visible food (image px), and its drawn width (% of .sandwich-build) */
+type LayerBox = { width: number; height: number; top: number; bottom: number; drawn: number }
+const paddedBox = (top: number, bottom: number): LayerBox => ({ width: 1536, height: 512, top, bottom, drawn: 88 })
+/** PNGs trimmed right to the food: no padding, so they're drawn a little narrower to match the padded ones */
+const trimmedBox = (height: number, drawn: number): LayerBox => ({ width: 1200, height, top: 0, bottom: height, drawn })
+const layerBoxes = new Map<string, LayerBox>([
+  [turkeyLayer, paddedBox(160, 356)],
+  [cheeseLayer, paddedBox(152, 340)],
+  [lettuceLayer, paddedBox(152, 348)],
+  [tomatoLayer, paddedBox(152, 364)],
+  [cucumberLayer, paddedBox(172, 332)],
+  [onionLayer, paddedBox(148, 320)],
+  [peppersLayer, paddedBox(172, 336)],
+  [olivesLayer, paddedBox(176, 332)],
+  [chickenLayer, trimmedBox(154, 86)],
+  [roastBeefLayer, trimmedBox(160, 86)],
+  [swissLayer, trimmedBox(165, 86)],
+  [provoloneLayer, trimmedBox(140, 86)],
+  [breadBottomLayer, paddedBox(104, 411)],
+  [italianHerbsLayer, trimmedBox(255, 85)],
+  [wheatLayer, trimmedBox(249, 85)],
+  [honeyOatLayer, trimmedBox(249, 85)],
 ])
-/** layers render at 88% of .sandwich-build's width, so 1 image px = 88/1536 % of that width */
-const layerPxToPct = (px: number) => (px * 88) / 1536
+/** where the first filling's bottom edge lands on each bottom bread: just above the crumb/crust line (image px) */
+const breadLanding = new Map<string, number>([
+  [breadBottomLayer, 288],
+  [italianHerbsLayer, 136],
+  [wheatLayer, 147],
+  [honeyOatLayer, 131],
+])
 
-/** negative margins that tuck a filling layer under its neighbours, scaled by its stretch */
-const layerMargins = (layer: string, stretch: number): CSSProperties => {
-  const [top, bottom] = layerBands.get(layer) ?? [160, 345]
-  const band = bottom - top
+/** size + negative margins that tuck a layer against its neighbours: the layer above lands `landing` px down this image */
+const layerStyle = (layer: string, landing: (box: LayerBox) => number, stretch = 1): CSSProperties => {
+  const box = layerBoxes.get(layer) ?? paddedBox(160, 345)
+  const toPct = (px: number) => (px * box.drawn * stretch) / box.width
   return {
-    marginTop: `${-layerPxToPct(top + (1 - layerReveal) * band) * stretch}%`,
-    marginBottom: `${-layerPxToPct(512 - bottom) * stretch}%`,
+    width: `${box.drawn}%`,
+    // a fixed ratio overrides the PNG's own, so repeat portions stretch the image vertically
+    aspectRatio: `${box.width} / ${Math.round(box.height * stretch)}`,
+    marginTop: `${-toPct(landing(box))}%`,
+    marginBottom: `${-toPct(box.height - box.bottom)}%`,
   }
 }
+const fillingStyle = (layer: string, stretch: number) =>
+  layerStyle(layer, (box) => box.top + (1 - layerReveal) * (box.bottom - box.top), stretch)
+const bottomBreadStyle = (layer: string) => layerStyle(layer, (box) => breadLanding.get(layer) ?? box.top)
 
 const layerStretch = (amount: number) => 1 + portionStretch * (Math.min(Math.max(amount, 1), 3) - 1)
 type ToppingAmounts = Record<string, number>
+
+/** pickup is limited to opening hours (9 AM – 9 PM), in 15-minute steps, at least 15 minutes from now */
+const pickupOpens = 9 * 60
+const pickupCloses = 21 * 60
+const pickupStep = 15
+
+const formatPickup = (minutes: number) => {
+  const hour = Math.floor(minutes / 60)
+  return `${hour % 12 || 12}:${String(minutes % 60).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`
+}
+
+/** "12:30", "1pm", "noon" → minutes since midnight; without AM/PM, 1–8 means the afternoon since the shop opens at 9 */
+const parsePickup = (text: string): number | null => {
+  const value = text.trim().toLowerCase()
+  if (value === "noon") return 12 * 60
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(value)
+  if (!match) return null
+  let hour = Number(match[1])
+  const minute = Number(match[2] ?? 0)
+  if (minute > 59 || hour > 23 || (match[3] && (hour < 1 || hour > 12))) return null
+  if (match[3]) hour = (hour % 12) + (match[3] === "pm" ? 12 : 0)
+  else if (hour >= 1 && hour < 9) hour += 12
+  return hour * 60 + minute
+}
+
+/** turns whatever the chatbot (or an old draft) stored into the picker's own wording */
+const toPickupValue = (text: string) => {
+  if (text.trim().toLowerCase() === "asap") return "ASAP"
+  const minutes = parsePickup(text)
+  return minutes === null ? text : formatPickup(minutes)
+}
+
+const getPickupChoices = (now: Date) => {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const earliest = nowMinutes + pickupStep
+  const today = earliest <= pickupCloses
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+  const slots: string[] = []
+  for (let minutes = pickupOpens; minutes <= pickupCloses; minutes += pickupStep) {
+    // once it's too late for today, offer tomorrow's times (dated, so order history stays correct)
+    if (!today) slots.push(`${tomorrow}, ${formatPickup(minutes)}`)
+    else if (minutes >= earliest) slots.push(formatPickup(minutes))
+  }
+  if (today && nowMinutes >= pickupOpens) slots.unshift("ASAP")
+  const isAllowed = (value: string) => {
+    if (slots.includes(value)) return true
+    // an in-between time agreed in chat, such as 12:40
+    const minutes = parsePickup(value)
+    return today && minutes !== null && minutes >= Math.max(earliest, pickupOpens) && minutes <= pickupCloses
+  }
+  return { slots, isAllowed }
+}
 
 const emptyToppingAmounts: ToppingAmounts = Object.fromEntries(
   toppingOptions.map((option) => [option.name, 0])
@@ -167,6 +268,17 @@ type CartItem = {
 }
 
 const draftStorageKey = DRAFT_STORAGE_KEY
+
+const chatOfflineMessage = "The chat assistant isn't available right now. You can still build your sub here."
+
+/** an unreachable server answers with an empty page instead of JSON */
+const readChatResponse = async (response: Response) => {
+  try {
+    return (await response.json()) as ChatbotResponse
+  } catch {
+    throw new Error(chatOfflineMessage)
+  }
+}
 const cartStorageKey = CART_STORAGE_KEY
 
 const serverToLocalNameMap: Record<string, string> = {
@@ -257,6 +369,14 @@ function OrderSection() {
   const [cartOpen, setCartOpen] = useState(false)
   const [pickupName, setPickupName] = useState("")
   const [pickupTime, setPickupTime] = useState("")
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    // keeps the pickup times current while the page stays open
+    const timer = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const pickupChoices = getPickupChoices(now)
+  const selectedPickup = pickupChoices.isAllowed(pickupTime) ? pickupTime : ""
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
   const initRef = useRef(false)
@@ -288,7 +408,8 @@ function OrderSection() {
   // One layer per ingredient (extra portions stretch it taller instead of stacking copies).
   // Past maxPreviewLayers distinct ingredients, collapse to one layer per category so the stack stays short.
   const previewLayers = useMemo<PreviewLayer[]>(() => {
-    const categoryOrder: ProductOption[] = ["Sauce", "Cheese", "Protein", "Veggies"]
+    // sauces are not stacked: they stand in bowls beside the board (see previewSauces)
+    const categoryOrder: ProductOption[] = ["Cheese", "Protein", "Veggies"]
     const perIngredient = categoryOrder.flatMap((category) =>
       selectedOptions
         .filter((option) => option.category === category)
@@ -311,7 +432,18 @@ function OrderSection() {
     })
   }, [selectedOptions, toppingAmounts])
 
-  const previewPortionCount = previewLayers.reduce((total, entry) => total + entry.amount, 0)
+  // the bottom bread shown in the preview: the chosen bread (the one with most portions if several are picked)
+  const previewBread = selectedOptions
+    .filter((option) => option.category === "Bread")
+    .reduce<ToppingOption | null>(
+      (best, option) => (best && toppingAmounts[best.name] >= toppingAmounts[option.name] ? best : option),
+      null
+    )
+  const previewBreadLayer = previewBread ? previewBread.layer ?? breadBottomLayer : null
+
+  const previewSauces = selectedOptions.filter((option) => option.side)
+  const previewPortionCount = [...previewLayers, ...previewSauces.map((option) => ({ amount: toppingAmounts[option.name] ?? 0 }))]
+    .reduce((total, entry) => total + entry.amount, 0)
 
 
   const totalPrice = useMemo(() => {
@@ -401,7 +533,7 @@ function OrderSection() {
       setUndoSnapshot(null)
       if (response.order.size) setSandwichSize(response.order.size)
       if (response.order.name) setPickupName(response.order.name)
-      if (response.order.pickup_time) setPickupTime(response.order.pickup_time)
+      if (response.order.pickup_time) setPickupTime(toPickupValue(response.order.pickup_time))
 
       if (response.status === "complete" && response.order_id) {
         const summary = mappedSelections.length > 0 ? mappedSelections.join(", ") : "Custom sub"
@@ -436,6 +568,7 @@ function OrderSection() {
 
   async function resetChatSession() {
     clearPreview()
+    setChatMessages([])
     setChatLoading(true)
     setChatError(null)
     try {
@@ -449,7 +582,7 @@ function OrderSection() {
         body: JSON.stringify(payload),
       })
 
-      const data = (await response.json()) as ChatbotResponse
+      const data = await readChatResponse(response)
       if (!response.ok) throw new Error(data.error ?? "Could not reset chat.")
 
       applyChatState(data)
@@ -497,7 +630,7 @@ function OrderSection() {
         }),
       })
 
-      const data = (await response.json()) as ChatbotResponse
+      const data = await readChatResponse(response)
       if (!response.ok) throw new Error(data.error ?? "Chat request failed.")
 
       applyChatState(data)
@@ -638,18 +771,18 @@ function OrderSection() {
       setCheckoutMessage("Add a pickup name before confirming.")
       return
     }
-    if (!pickupTime.trim()) {
-      setCheckoutMessage("Add a pickup time before confirming.")
+    if (!getPickupChoices(new Date()).isAllowed(pickupTime)) {
+      setNow(new Date())
+      setCheckoutMessage("Choose a pickup time between 9 AM and 9 PM, at least 15 minutes from now.")
       return
     }
 
     const trimmedName = pickupName.trim()
-    const trimmedTime = pickupTime.trim()
     saveCompletedOrder({
       id: `order-${Date.now()}`,
       ...(user ? { account_id: user.id } : {}),
       pickupName: trimmedName,
-      pickupTime: trimmedTime,
+      pickupTime,
       items: cartItems.map((item) => ({
         ...item,
         ...(user ? { account_id: user.id } : {}),
@@ -660,7 +793,7 @@ function OrderSection() {
       source: "manual",
     })
 
-    const confirmation = `Order confirmed for ${trimmedName} at ${trimmedTime}.`
+    const confirmation = `Order confirmed for ${trimmedName}. Pickup: ${pickupTime}.`
     setCartItems([])
     setAddedCount(0)
     setCartOpen(false)
@@ -706,20 +839,25 @@ function OrderSection() {
           setChatMessages(Array.isArray(draft.chatMessages) ? draft.chatMessages : [])
           setChatSessionId(draft.chatSessionId ?? null)
           setPickupName(draft.pickupName ?? "")
-          setPickupTime(draft.pickupTime ?? "")
+          setPickupTime(toPickupValue(draft.pickupTime ?? ""))
 
           if (draft.chatSessionId) {
-            const response = await fetch(`/api/session?session_id=${encodeURIComponent(draft.chatSessionId)}`)
-            if (response.ok) {
-              const state = (await response.json()) as ChatbotResponse
+            try {
+              const response = await fetch(`/api/session?session_id=${encodeURIComponent(draft.chatSessionId)}`)
+              const state = await readChatResponse(response)
+              if (!response.ok) throw new Error(chatOfflineMessage)
               if (state.status === "idle") {
+                // the server no longer knows this conversation, so its old lines would only mislead
+                setChatMessages([])
                 setChatSessionId(state.session_id)
                 setChatError("The assistant session expired. Your local draft was preserved, so you can continue.")
               } else {
                 applyChatState(state)
               }
-            } else {
-              await resetChatSession()
+            } catch {
+              // server unreachable: keep the sandwich, drop the old conversation
+              setChatMessages([])
+              setChatError(chatOfflineMessage)
             }
           }
         } catch {
@@ -765,6 +903,10 @@ function OrderSection() {
     <section className="order-section">
       <style>{`
         * { box-sizing: border-box; }
+        /* the dark photo sits behind the logo only; on this page the nav links are over the light background */
+        body:has(.order-section) nav a.text-white { color: #111; }
+        body:has(.order-section) nav a.text-white:hover { color: var(--color-red-600, #dc2626); }
+
         .order-section {
           /* light slate palette — every colour on the page comes from these */
           --bg: #e4e8e5;
@@ -827,17 +969,32 @@ function OrderSection() {
            its right edge lands ~11.92vh from the stage's left edge, so the heading starts 16px past that */
         .product-panel .stage-heading h1 { position: absolute; top: calc(5vh - 6px); left: calc(11.92vh + 16px); transform: translateY(-50%); margin: 0; white-space: nowrap; color: #fff; text-shadow: 0 2px 10px rgba(30, 20, 12, 0.55); }
         /* The stack is built bottom-up (column-reverse) so each higher layer paints over the one below.
-           All layer PNGs are 1536×512 with transparent padding, so they overlap via negative margins
+           Layers overlap via negative margins, worked out from each PNG's measured food edges
            (percentages resolve against .sandwich-build's width):
              margin-top    = -(where the next layer should land, measured from this image's top)
              margin-bottom = -(transparent space under this image's visible content)            */
         .sandwich-build { width: min(460px, 62%); margin: 0 auto; display: flex; flex-direction: column-reverse; align-items: center; }
         /* margin-bottom tucks away the transparent strip under the board (117 of the PNG's 512px = 7.62% of its width) */
-        .sandwich-build > .plate { width: 100%; height: auto; margin-top: -15%; margin-bottom: -7.62%; pointer-events: none; filter: drop-shadow(0 10px 12px rgba(40, 26, 17, 0.25)); }
+        .sandwich-build > .plate { transform: scaleX(1.1); width: 100%; height: auto; margin-top: -15%; margin-bottom: -7.62%; pointer-events: none; filter: drop-shadow(0 10px 12px rgba(40, 26, 17, 0.25)); }
+        /* the stretch of counter right of the board. --free is its width: half of what the board
+           (1.1 × the .sandwich-build width) leaves over. It starts at the counter's back edge, 34.6cqw down the photo */
+        .sauce-bowls { --free: calc((100cqw - 1.1 * min(460px, 62cqw - 20px)) / 2); position: absolute; right: 0; top: 34.6cqw; bottom: 0; width: var(--free); pointer-events: none; }
+        .sauce-bowls img { position: absolute; width: min(calc(var(--free) * 0.56), 125px); height: auto; filter: drop-shadow(0 6px 5px rgba(40, 26, 17, 0.35)); }
+        /* zig-zag from back to front, so no bowl hides another's sauce */
+        .sauce-bowls img:nth-child(1) { left: 4%; bottom: 58%; }
+        .sauce-bowls img:nth-child(2) { left: 40%; bottom: 33%; }
+        .sauce-bowls img:nth-child(3) { left: 4%; bottom: 6%; }
+        .sauce-bowls img:only-child { left: 20%; bottom: 33%; }
+        /* everything on the board. --stretch-x lengthens both sizes; the oversized insets leave room for overlaps and shadows */
+        .sandwich-stack { --stretch-x: 1.12; width: 100%; display: flex; flex-direction: column-reverse; align-items: center; clip-path: inset(-100% -20% -100% -20%); transform: translateX(0) scaleX(var(--stretch-x)); transition: clip-path 0.3s ease, transform 0.3s ease; }
+        /* 6-inch = a footlong cut in half: hide the right half, then slide the rest back to the board's centre
+           (the sandwich spans ~7–93% of the board, so its left half is centred at 28.5%: 50 - 28.5 = 21.5) */
+        .sandwich-stack.six-inch { clip-path: inset(-100% 50% -100% -20%); transform: translateX(calc(21.5% * var(--stretch-x))) scaleX(var(--stretch-x)); }
+        /* on a wrapper, so the shadows are drawn after the cut: #cut-shade darkens the cut end, drop-shadow falls beside it */
+        .sandwich-cut { width: 100%; }
+        .sandwich-cut.six-inch { filter: url(#cut-shade) drop-shadow(8px 4px 7px rgba(30, 18, 10, 0.5)); }
         .layer { display: block; width: 88%; height: auto; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(40, 26, 17, 0.28)); }
-        /* -16.5% lands the first filling ~288px down the bread PNG, just above where the white crumb meets the crust */
-        .layer-bread-bottom { margin-top: -16.5%; margin-bottom: -6%; }
-        /* .layer-filling margins are set inline per image (see layerMargins) because each PNG has different padding */
+        /* fillings and the bottom bread get their width + margins inline (see layerStyle) because each PNG has different padding */
         .layer-bread-top { margin-bottom: -6%; }
         .ingredient-layer {
           width: 82%;
@@ -879,21 +1036,26 @@ function OrderSection() {
 
         /* takes whatever height is left in the column and scrolls inside itself; the 4px padding keeps the
            selected cards' outline from being clipped at the scroll edges */
-        .topping-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; align-content: start; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 0 -4px; padding: 4px; }
-        .topping-item { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px 8px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 118px; }
+        .topping-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; align-content: start; display: grid; grid-auto-rows: max-content; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0 -4px; padding: 4px; }
+        .topping-item { overflow: hidden; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px 10px 12px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; min-height: 180px; }
         .topping-item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(224, 54, 47, 0.25); }
-        .topping-swatch { width: 72px; height: 72px; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; background: var(--field); }
+        .topping-swatch { flex: none; width: clamp(84px, 55%, 120px); aspect-ratio: 1; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; background: var(--field); }
         .topping-swatch img { width: 100%; height: 100%; object-fit: cover; display: block; }
         /* transparent cut-outs: no box, wider frame to match the 992×672 PNGs */
-        .topping-swatch.cutout { width: 108px; height: 76px; border: 0; border-radius: 0; background: transparent; overflow: visible; }
-        .topping-swatch.cutout img { object-fit: contain; transform: scale(1.25); filter: drop-shadow(0 4px 6px rgba(31, 35, 33, 0.22)); }
-        .topping-item .name { font-size: 0.66rem; color: var(--text-muted); font-weight: 600; }
+        .topping-swatch.cutout { position: relative; min-height: 0; width: min(86%, 176px); aspect-ratio: 992 / 672; border: 0; border-radius: 0; background: transparent; overflow: visible; }
+        .topping-swatch.cutout img { position: absolute; inset: 0; pointer-events: none; object-fit: contain; transform: scale(1.15); filter: drop-shadow(0 4px 6px rgba(31, 35, 33, 0.22)); }
+        /* the sauce bowls are trimmed to their edge (no padding), so they need no enlarging */
+        .topping-swatch.cutout.bowl img { transform: none; }
+        /* photos on a light background: brightness turns the grey into white, and multiply makes white disappear.
+           No drop-shadow here, it would outline the photo's rectangle (the photos have their own shadow) */
+        .topping-swatch.cutout.photo img { mix-blend-mode: multiply; filter: brightness(1.08); transform: scale(var(--photo-zoom)); }
+        .topping-item .name { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
         .topping-item.selected .name { color: var(--text); }
         .topping-stepper { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
-        .topping-stepper button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: var(--text); font-size: 1rem; line-height: 1; cursor: pointer; }
+        .topping-stepper button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--text); font-size: 1rem; line-height: 1; cursor: pointer; }
         .topping-stepper button:hover:not(:disabled) { background: var(--surface-hover); }
         .topping-stepper button:disabled { color: var(--text-faint); opacity: 0.5; cursor: not-allowed; }
-        .topping-stepper .amount { min-width: 15px; text-align: center; font-size: 0.72rem; font-weight: 700; color: var(--text); }
+        .topping-stepper .amount { min-width: 18px; text-align: center; font-size: 0.84rem; font-weight: 700; color: var(--text); }
 
         .builder-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.7rem; color: var(--text-muted); }
         .builder-summary-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -1004,6 +1166,7 @@ function OrderSection() {
 
         @media (prefers-reduced-motion: reduce) {
           .chat-staff.processing img { animation: none; }
+          .sandwich-stack { transition: none; }
         }
 `}</style>
 
@@ -1033,37 +1196,59 @@ function OrderSection() {
                 </div>
                 {/* column-reverse: first child sits at the bottom, so this list reads plate → bread → fillings → bread */}
                 <div className="sandwich-build" aria-hidden="true">
+                  {/* inner shadow along right-facing edges: whatever lies within ~20px of the cut gets darker */}
+                  <svg width="0" height="0" style={{ position: "absolute" }}>
+                    <filter id="cut-shade" x="-50%" y="-150%" width="200%" height="400%" colorInterpolationFilters="sRGB">
+                      <feOffset in="SourceAlpha" dx="-16" dy="0" result="moved" />
+                      <feGaussianBlur in="moved" stdDeviation="9 0" result="soft" />
+                      <feFlood floodColor="#2a1608" floodOpacity="0.8" />
+                      <feComposite in2="soft" operator="out" result="edge" />
+                      <feComposite in="edge" in2="SourceAlpha" operator="in" result="shade" />
+                      <feMerge>
+                        <feMergeNode in="SourceGraphic" />
+                        <feMergeNode in="shade" />
+                      </feMerge>
+                    </filter>
+                  </svg>
                   <img className="plate" src={woodenPlate} alt="" />
-                  {hasBread ? <img className="layer layer-bread-bottom" src={breadBottomLayer} alt="" /> : null}
-                  {/* previewLayers is ordered top-down, so reverse it to stack bottom-up */}
-                  {[...previewLayers].reverse().map(({ option, amount }) => {
-                    const stretch = layerStretch(amount)
-                    return option.layer ? (
-                      <img
-                        key={`preview-${option.name}`}
-                        className="layer layer-filling"
-                        src={option.layer}
-                        alt=""
-                        // a fixed ratio overrides the PNG's own 3:1, so the image stretches vertically
-                        style={{ aspectRatio: `1536 / ${Math.round(512 * stretch)}`, ...layerMargins(option.layer, stretch) }}
-                      />
-                    ) : (
-                      <div
-                        key={`preview-${option.name}`}
-                        className="ingredient-layer"
-                        style={{
-                          "--stretch": stretch,
-                          backgroundImage: `linear-gradient(rgba(35, 28, 23, 0.16), rgba(35, 28, 23, 0.16)), url(${option.image})`,
-                        } as CSSProperties}
-                      >
-                        <span>{option.name}</span>
-                      </div>
-                    )
-                  })}
-                  {hasBread ? <img className="layer layer-bread-top" src={breadTopLayer} alt="" /> : null}
+                  <div className={`sandwich-cut${sandwichSize === "6-inch" ? " six-inch" : ""}`}>
+                  <div className={`sandwich-stack${sandwichSize === "6-inch" ? " six-inch" : ""}`}>
+                    {previewBreadLayer ? <img className="layer" src={previewBreadLayer} alt="" style={bottomBreadStyle(previewBreadLayer)} /> : null}
+                    {/* previewLayers is ordered top-down, so reverse it to stack bottom-up */}
+                    {[...previewLayers].reverse().map(({ option, amount }) => {
+                      const stretch = layerStretch(amount)
+                      return option.layer ? (
+                        <img
+                          key={`preview-${option.name}`}
+                          className="layer"
+                          src={option.layer}
+                          alt=""
+                          style={fillingStyle(option.layer, stretch)}
+                        />
+                      ) : (
+                        <div
+                          key={`preview-${option.name}`}
+                          className="ingredient-layer"
+                          style={{
+                            "--stretch": stretch,
+                            backgroundImage: `linear-gradient(rgba(35, 28, 23, 0.16), rgba(35, 28, 23, 0.16)), url(${option.image})`,
+                          } as CSSProperties}
+                        >
+                          <span>{option.name}</span>
+                        </div>
+                      )
+                    })}
+                    {hasBread ? <img className="layer layer-bread-top" src={breadTopLayer} alt="" /> : null}
+                  </div>
+                  </div>
+                </div>
+                <div className="sauce-bowls" aria-hidden="true">
+                  {previewSauces.map((option) => (
+                    <img key={option.name} src={option.side} alt="" />
+                  ))}
                 </div>
                 <div className="preview-meta">
-                  {previewLayers.length === 0 && !hasBread
+                  {previewPortionCount === 0 && !hasBread
                     ? "Select toppings to build your sandwich"
                     : `${previewPortionCount} ingredient portion${previewPortionCount === 1 ? "" : "s"} selected`}
                 </div>
@@ -1210,7 +1395,7 @@ function OrderSection() {
                       key={topping.name}
                       className={`topping-item${isSelected ? " selected" : ""}`}
                     >
-                      <div className={`topping-swatch${topping.icon ? " cutout" : ""}`} aria-hidden="true">
+                      <div className={`topping-swatch${topping.icon ? " cutout" : ""}${topping.category === "Sauce" ? " bowl" : ""}${topping.photoZoom ? " photo" : ""}`} style={{ "--photo-zoom": topping.photoZoom } as CSSProperties} aria-hidden="true">
                         <img src={topping.icon ?? topping.image} alt="" loading="lazy" />
                       </div>
                       <div className="topping-stepper" aria-label={`${topping.name} quantity`}>
@@ -1328,13 +1513,20 @@ function OrderSection() {
                             onChange={(event) => setPickupName(event.target.value)}
                             placeholder="Pickup name"
                           />
-                          <input
+                          <select
                             className="checkout-input"
                             aria-label="Pickup time"
-                            value={pickupTime}
+                            value={selectedPickup}
                             onChange={(event) => setPickupTime(event.target.value)}
-                            placeholder="Pickup time"
-                          />
+                          >
+                            <option value="" disabled>Pickup time</option>
+                            {selectedPickup && !pickupChoices.slots.includes(selectedPickup) ? (
+                              <option value={selectedPickup}>{selectedPickup}</option>
+                            ) : null}
+                            {pickupChoices.slots.map((slot) => (
+                              <option key={slot} value={slot}>{slot}</option>
+                            ))}
+                          </select>
                         </div>
                         <div className="cart-total-row">
                           <span>Total ${cartTotal.toFixed(2)}</span>

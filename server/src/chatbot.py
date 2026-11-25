@@ -3,7 +3,10 @@
 #failure to extract intentions will result in the chatbot guessing intention with unfamiliar word based on learned interactions.
 #Finally, if guessing fail, the chatbot return generic response, telling the user that it do not understand the query.
 #**adapted from restaurant booking to sandwich ordering, see server/CHATBOT_CHANGES.md for the logic changes
-from learning_resource.response_database import BUSINESS_INFO, INTENT_KEYWORDS, MENU_ITEMS, ORDER_FIELD_KEYWORDS, ORDER_KEYWORDS, NUMBER_WORDS, STOP_WORDS
+from learning_resource.response_database import (
+    BUSINESS_INFO, INTENT_KEYWORDS, MENU_ITEMS, ORDER_FIELD_KEYWORDS, ORDER_KEYWORDS, NUMBER_WORDS,
+    PICKUP_CLOSES, PICKUP_OPENS, STOP_WORDS, UNAVAILABLE_ITEMS,
+)
 from db.order_store import save_order
 from models.order_session import (
     ACTIVE_STATUSES, LIST_FIELDS, NO_SELECTION, OPTIONAL_FIELDS,
@@ -12,11 +15,12 @@ from models.order_session import (
 from learning_resource.model_learning import appending_learning_entry, predict_intent_from_learned_entries
 from text_normalization import lemmatize_word, lemmatize_words
 import random
+import re
 
 
 NAME_PREFIX_WORDS = {"the", "a", "an", "name", "is"}
 #intents that can be answered in the middle of an order without losing the order progress
-SIDE_QUESTION_INTENTS = {"operation", "contact", "menu"}
+SIDE_QUESTION_INTENTS = {"operation", "contact", "menu", "delivery"}
 #words that can never be a customer name
 NON_NAME_WORDS = (
     set(STOP_WORDS)
@@ -25,12 +29,15 @@ NON_NAME_WORDS = (
     | {word for keywords in ORDER_KEYWORDS.values() if isinstance(keywords, list) for keyword in keywords for word in keyword.split()}
     | {word for keywords in ORDER_KEYWORDS["category"].values() for word in keywords}
     | {word for items in MENU_ITEMS.values() for item in items for alias in item["aliases"] for word in alias.split()}
+    | {alias for aliases in UNAVAILABLE_ITEMS.values() for alias in aliases}
     | {word for keywords in ORDER_FIELD_KEYWORDS["time"].values() for word in keywords}
     | {word for keywords in ORDER_FIELD_KEYWORDS["name"].values() for word in keywords}
     | {"it's", "its", "this", "call", "name's", "names", "just", "thanks", "thank"}
 )
 FILLER_WORDS = {"the", "any", "a", "an", "some", "more", "extra", "my", "of"}
 MAX_ORDER_INGREDIENTS = 8
+#how each category is called when talking to the customer
+CATEGORY_LABELS = {"bread": "bread", "protein": "meat", "cheese": "cheese", "veggies": "veggies", "sauce": "sauce"}
 
 
 def count_selected_ingredients(order):
@@ -78,6 +85,10 @@ def get_intent(phrase):
 
     #determine the top intention: operation info, contact, service ...
     top_intent = top_level_intent(normalized_words)
+
+    #"can I order delivery" is a question about delivery, unless the sentence also names ingredients
+    if mentions_delivery(word_list):
+        return ["service", "order" if has_order_signals(word_list) else "delivery"]
 
     #a sentence that names ingredients is an order even without the word "order", e.g. "footlong turkey on wheat"
     if top_intent != "service" and has_order_signals(word_list):
@@ -128,6 +139,10 @@ def second_level_intent(top_intent, word_list):
                 return subcategory_name
 
     return False
+
+def mentions_delivery(word_list):
+    return any(word in INTENT_KEYWORDS["service"]["delivery"] for word in word_list)
+
 
 #check if the query contains sandwich details (ingredients, size, pickup time when it is being asked),
 #return a boolean value that indicating whether the user is placing an order
@@ -217,7 +232,12 @@ def build_menu_aliases():
         for item in section_items:
             for alias in item["aliases"]:
                 alias_words = alias.lower().split()
-                menu_items.append((category, item, alias_words, lemmatize_words(alias_words)))
+                menu_items.append((category, item["name"], alias_words, lemmatize_words(alias_words), True))
+
+    for category, aliases in UNAVAILABLE_ITEMS.items():
+        for alias in aliases:
+            alias_words = alias.lower().split()
+            menu_items.append((category, alias, alias_words, lemmatize_words(alias_words), False))
 
     menu_items.sort(key=lambda entry: len(entry[2]), reverse=True)
     return menu_items
@@ -226,7 +246,8 @@ def build_menu_aliases():
 MENU_ALIASES = build_menu_aliases()
 
 
-#match the words in query against the ingredient catalog, return the matched ingredients with their position,
+#match the words in query against the ingredient catalog, return the matched ingredients with their position
+#("available" is False for ingredients the shop does not have),
 #and the set of word positions used by the matches
 def extract_order_items(word_list):
     normalized_words = lemmatize_words(word_list)
@@ -238,12 +259,12 @@ def extract_order_items(word_list):
         matched_item = None
 
         #loop through menu item list to match with the words in query
-        for category, item, alias_words, normalized_alias in MENU_ALIASES:
+        for category, name, alias_words, normalized_alias, available in MENU_ALIASES:
             alias_length = len(alias_words)
 
             #if the current position in the word list matches the words of a menu item
             if word_list[i:i + alias_length] == alias_words or normalized_words[i:i + alias_length] == normalized_alias:
-                matched_item = {"category": category, "name": item["name"], "start": i, "end": i + alias_length}
+                matched_item = {"category": category, "name": name, "start": i, "end": i + alias_length, "available": available}
                 break
 
         #if a menu item is found, record it and move the index forward by the number of words in the matched alias
@@ -338,6 +359,15 @@ def apply_order_details(word_list, session):
         else:
             additions.append(match)
 
+    #ingredients the shop does not have: the reply says so, and "swap swiss for mozzarella" keeps the swiss
+    session["unavailable"] = [match for match in additions if not match["available"]]
+    additions = [match for match in additions if match["available"]]
+    kept_categories = {match["category"] for match in session["unavailable"]} - {match["category"] for match in additions}
+    names_removal = bool(removals)
+    removals = [match for match in removals if match["available"] and match["category"] not in kept_categories]
+    #ingredients left out because the sub is full
+    session["left_out"] = []
+
     #category words that are not part of an ingredient name, e.g. "no cheese", "all veggies"
     negated_categories = set()
     mentioned_categories = set()
@@ -358,16 +388,6 @@ def apply_order_details(word_list, session):
         and ("veggies" in mentioned_categories or pending == "veggies" or "with everything" in phrase)
         and not any(match["category"] == "veggies" for match in additions)
     )
-    if wants_all:
-        remaining = MAX_ORDER_INGREDIENTS - count_selected_ingredients({
-            **order,
-            "veggies": [],
-        })
-        order["veggies"] = [
-            item["name"] for item in MENU_ITEMS["veggies"][:max(0, remaining)]
-        ]
-        changes.append("all veggies")
-
     for match in removals:
         category, name = match["category"], match["name"]
         if category in LIST_FIELDS:
@@ -384,14 +404,30 @@ def apply_order_details(word_list, session):
         if category in LIST_FIELDS:
             if order[category] is None:
                 order[category] = []
-            if name not in order[category] and count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS:
+            if name in order[category]:
+                continue
+            if count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS:
                 order[category].append(name)
                 changes.append(name)
+            else:
+                session["left_out"].append(name)
         elif order[category] != name and (
-            order[category] is not None or count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS
+            category == "size" or order[category] is not None or count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS
         ):
             order[category] = name
             changes.append(name)
+        elif order[category] is None:
+            session["left_out"].append(name)
+
+    #after the named ingredients, so "everything" never takes the place of the bread or cheese
+    if wants_all:
+        removed_names = [match["name"] for match in removals if match["category"] == "veggies"]
+        wanted = [item["name"] for item in MENU_ITEMS["veggies"] if item["name"] not in removed_names]
+        remaining = max(0, MAX_ORDER_INGREDIENTS - count_selected_ingredients({**order, "veggies": []}))
+        order["veggies"] = wanted[:remaining]
+        session["left_out"] += wanted[remaining:]
+        changes.append("as many veggies as fit" if wanted[remaining:] else "all veggies")
+        changes.extend(f"no {name}" for name in removed_names if f"no {name}" not in changes)
 
     for category in negated_categories & OPTIONAL_FIELDS:
         order[category] = [] if category in LIST_FIELDS else NO_SELECTION
@@ -403,6 +439,8 @@ def apply_order_details(word_list, session):
         pending in OPTIONAL_FIELDS
         and pending not in touched_categories
         and not (wants_all and pending == "veggies")
+        #the "no" in "no cucumber" is about the cucumber
+        and not names_removal
         and any(word in ORDER_KEYWORDS["none"] for word in word_list)
     ):
         order[pending] = [] if pending in LIST_FIELDS else NO_SELECTION
@@ -416,6 +454,8 @@ def apply_order_details(word_list, session):
     pickup_time = extract_pickup_time(word_list, pending)
     if pickup_time == "unclear":
         session["unclear_time"] = pending == "pickup_time"
+    elif pickup_time and not is_open_at(pickup_time):
+        session["closed_time"] = True
     elif pickup_time and pickup_time != order["pickup_time"]:
         order["pickup_time"] = pickup_time
         changes.append(f"pickup {format_pickup_time(pickup_time)}")
@@ -439,32 +479,70 @@ def continue_order(word_list, session, started=False):
 
     was_confirming = session["status"] == "confirming"
     session["unclear_time"] = False
+    session["closed_time"] = False
     changes = apply_order_details(word_list, session)
+    session["pending"] = next_missing_step(session["order"])
+    notice = build_notice(word_list, session)
 
     #waiting for the user to confirm the review
     if was_confirming and not changes:
+        if notice:
+            return f"{notice} {build_order_review(session['order'])}"
         if any(word in ORDER_KEYWORDS["confirm"] for word in word_list) and not any(word in ORDER_KEYWORDS["reject"] for word in word_list):
             return place_order(session)
         if any(word in ORDER_KEYWORDS["reject"] for word in word_list):
             return "No problem, what would you like to change? You can say things like \"swap swiss for cheddar\" or \"no onions\"."
         return f"Sorry, I didn't catch that. {build_order_review(session['order'])}"
 
-    session["pending"] = next_missing_step(session["order"])
-
     if session["pending"] is None:
         session["status"] = "confirming"
-        return build_order_review(session["order"])
+        return f"{notice} {build_order_review(session['order'])}".strip()
 
     session["status"] = "building"
     if session["unclear_time"]:
         return "Could you give me a specific pickup time, like \"at 12:30\" or \"ASAP\"?"
 
     if changes:
-        return f"Got it: {', '.join(changes)}. {prompt_for_step(session)}"
+        return f"{notice} Got it: {', '.join(changes)}. {prompt_for_step(session)}".strip()
+    if notice:
+        return f"{notice} {prompt_for_step(session)}"
     if started:
         return f"Great, let's build your sub! {prompt_for_step(session)}"
 
     return f"Sorry, I didn't catch that. {prompt_for_step(session)}"
+
+
+#things the customer should know before the next question: ingredients the shop does not have, a pickup time outside
+#opening hours, or that chat orders cannot be delivered
+def build_notice(word_list, session):
+    notices = []
+
+    for category, label in CATEGORY_LABELS.items():
+        names = [match["name"] for match in session["unavailable"] if match["category"] == category]
+        if not names:
+            continue
+        notice = f"Sorry, we don't have {' or '.join(names)}."
+        #the question for this step already lists the options
+        if session["pending"] != category:
+            notice += f" For {label} we have {list_options(category)}."
+        notices.append(notice)
+
+    if session["left_out"]:
+        notices.append(
+            f"A sub holds up to {MAX_ORDER_INGREDIENTS} portions including the bread, so I left out "
+            f"{', '.join(session['left_out'])}. You can remove something to make room."
+        )
+
+    if session["closed_time"]:
+        notice = "Sorry, we can only do pickups between 9 AM and 9 PM."
+        if session["order"]["pickup_time"]:
+            notice += f" I kept your pickup {format_pickup_time(session['order']['pickup_time'])}."
+        notices.append(notice)
+
+    if mentions_delivery(word_list):
+        notices.append(BUSINESS_INFO["service"]["details"]["pickup_only"])
+
+    return " ".join(notices)
 
 
 def list_options(category):
@@ -490,7 +568,7 @@ def prompt_for_step(session):
     if step == "name":
         return "What name should I put the order under?"
     if step == "pickup_time":
-        return "When would you like to pick it up? For example \"at 12:30\" or \"ASAP\"."
+        return "When would you like to pick it up? We're open from 9 AM to 9 PM, so for example \"at 12:30\" or \"ASAP\"."
     if session["status"] == "confirming":
         return build_order_review(session["order"])
 
@@ -614,12 +692,43 @@ def is_time_value(text):
 
     return False
 
+#minutes since midnight for "12:30", "1pm" or "noon", None when it is not a real time. without am/pm, 1 to 8 means the
+#afternoon since the shop opens at 9 (the order page reads times the same way)
+def pickup_minutes(pickup_time):
+    if pickup_time == "noon":
+        return 12 * 60
+
+    match = re.fullmatch(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", pickup_time)
+    if not match:
+        return None
+
+    hour, minute, suffix = int(match[1]), int(match[2] or 0), match[3]
+    if minute > 59 or hour > 23 or (suffix and not 1 <= hour <= 12):
+        return None
+    if suffix:
+        hour = hour % 12 + (12 if suffix == "pm" else 0)
+    elif 1 <= hour < 9:
+        hour += 12
+
+    return hour * 60 + minute
+
+
+def is_open_at(pickup_time):
+    if pickup_time == "ASAP":
+        return True
+
+    minutes = pickup_minutes(pickup_time)
+    return minutes is not None and PICKUP_OPENS <= minutes <= PICKUP_CLOSES
+
+
 def build_guess_message(top_intent, sub_intent):
     if top_intent == "service":
         if sub_intent == "order":
             return "I am guessing you want to order a sandwich."
         if sub_intent == "menu":
             return "I am guessing you want to see the ingredients."
+        if sub_intent == "delivery":
+            return "I am guessing you are asking about delivery."
 
     if top_intent == "contact":
         return "I am guessing you want the shop contact information."
@@ -655,6 +764,10 @@ def get_response(original_phrase, intents, guessed_from_learning=False, session=
         if session is None:
             session = get_session()[1]
         response = start_order(word_list, session)
+        appending_learning_entry(original_phrase, top_intent, sub_intent)
+        return format_guessed_response(response, top_intent, sub_intent) if guessed_from_learning else response
+    elif "delivery" in intents:
+        response = BUSINESS_INFO["service"]["details"]["delivery"]
         appending_learning_entry(original_phrase, top_intent, sub_intent)
         return format_guessed_response(response, top_intent, sub_intent) if guessed_from_learning else response
     elif "menu" in intents:

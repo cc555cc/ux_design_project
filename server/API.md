@@ -20,7 +20,7 @@ Every chat endpoint returns the same state object. The frontend should redraw th
   "status": "building",
   "step": "cheese",
   "order": {
-    "bread": "Whole Wheat",
+    "bread": "Wheat",
     "size": "Footlong",
     "protein": "Turkey",
     "cheese": null,
@@ -62,11 +62,11 @@ Response `200`: `{ "reply": "<bot text>", ...session state }`
 
 ```json
 {
-  "reply": "Got it: Footlong, Italian, Turkey, Swiss. Which veggies would you like? …",
+  "reply": "Got it: Footlong, Italian Herbs, Turkey, Swiss. Which veggies would you like? …",
   "session_id": "3f2a…",
   "status": "building",
   "step": "veggies",
-  "order": { "bread": "Italian", "size": "Footlong", "protein": "Turkey", "cheese": "Swiss", "veggies": null, "sauce": null, "name": null, "pickup_time": null },
+  "order": { "bread": "Italian Herbs", "size": "Footlong", "protein": "Turkey", "cheese": "Swiss", "veggies": null, "sauce": null, "name": null, "pickup_time": null },
   "total": 10.99,
   "order_id": null
 }
@@ -86,14 +86,14 @@ Errors: `400` if the body is not a JSON object or `message` is empty: `{ "error"
 | Out of order | "my name is Carson" while being asked about cheese | Detail recorded, bot repeats the current question |
 | Skip an optional step | "no cheese", "no veggies", "no thanks", "none" | Field set to `"none"` / `[]` |
 | All veggies | "all veggies", "everything except onions", "with everything" | All veggies, minus any excluded ones |
-| Swap | "swap swiss for cheddar", "replace turkey with ham", "ham instead of turkey", "change the bread to wheat" | Old item removed, new item set |
-| Remove | "no onions", "hold the pickles", "remove the turkey" | Item removed. Removing the only meat, cheese, bread or size makes the bot ask that step again. |
-| Side question | "what are your hours", "show me the menu", "what's your phone number" | Answered, then the pending question is repeated. The order is kept. |
+| Swap | "swap swiss for cheddar", "replace turkey with chicken", "chicken instead of turkey", "change the bread to wheat" | Old item removed, new item set |
+| Remove | "no onions", "hold the lettuce", "remove the turkey" | Item removed. Removing the only meat, cheese, bread or size makes the bot ask that step again. |
+| Side question | "what are your hours", "show me the menu", "what's your phone number", "do you deliver" | Answered, then the pending question is repeated. The order is kept. |
 | Confirm | "yes", "sounds good", "place it" (while `status` is `confirming`) | Order saved, `status` → `complete`, `order_id` set |
 | Reject | "no", "wait" (while `confirming`) | Bot asks what to change |
 | Cancel | "cancel", "start over" | `status` → `idle` |
 
-Unknown items ("brioche") get a "Sorry, I didn't catch that" plus the list of available options for the current step.
+Common items the shop does not have ("ham", "mozzarella") get "Sorry, we don't have ham" plus what is available. Pickup times outside 9 AM – 9 PM are refused. Other unknown items ("brioche") get a "Sorry, I didn't catch that" plus the list of available options for the current step.
 
 ## POST `/api/chat/reset`
 
@@ -113,7 +113,7 @@ Response `200`:
 {
   "steps": ["bread", "size", "protein", "cheese", "veggies", "sauce", "name", "pickup_time"],
   "categories": {
-    "bread":   [{ "name": "Italian", "price": 0 }, { "name": "Honey Oat", "price": 0.5 }, …],
+    "bread":   [{ "name": "Italian Herbs", "price": 0.5 }, { "name": "Honey Oat", "price": 0.5 }, …],
     "size":    [{ "name": "6-inch", "price": 6.99 }, { "name": "Footlong", "price": 10.99 }],
     "protein": […], "cheese": […], "veggies": […], "sauce": […]
   }
@@ -133,7 +133,7 @@ Response `200`:
       "id": "7a94669a",
       "name": "Carson",
       "pickup_time": "1:15pm",
-      "sandwich": { "bread": "Whole Wheat", "size": "Footlong", "protein": "Turkey", "cheese": "none", "veggies": ["Lettuce"], "sauce": ["Mayo"] },
+      "sandwich": { "bread": "Wheat", "size": "Footlong", "protein": "Turkey", "cheese": "none", "veggies": ["Lettuce"], "sauce": ["Mayo"] },
       "total": 10.99,
       "created_at": "2026-10-29T04:41:36"
     }

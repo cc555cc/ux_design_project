@@ -1,5 +1,6 @@
 #conversation tests for the sandwich ordering chatbot, run from the server folder with:
 #   python -m unittest discover tests
+import re
 import sys
 import tempfile
 import unittest
@@ -10,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import chatbot
 from db import order_store
-from learning_resource import model_learning
+from learning_resource import model_learning, response_database, response_database_minimal
 from models import order_session
 from models.order_session import NO_SELECTION, get_session
 
@@ -63,7 +64,7 @@ class OneStepOrderTest(ChatbotTestCase):
 
         self.assertEqual(self.session["status"], "confirming")
         self.assertEqual(self.order["size"], "Footlong")
-        self.assertEqual(self.order["bread"], "Italian")
+        self.assertEqual(self.order["bread"], "Italian Herbs")
         self.assertEqual(self.order["protein"], "Turkey")
         self.assertEqual(self.order["cheese"], "Swiss")
         self.assertEqual(self.order["veggies"], ["Lettuce", "Tomato"])
@@ -73,12 +74,12 @@ class OneStepOrderTest(ChatbotTestCase):
         self.assertIn("Shall I place the order?", reply)
 
     def test_order_without_order_keyword(self):
-        self.say("6 inch honey oat with ham")
+        self.say("6 inch honey oat with roast beef")
 
         self.assertEqual(self.session["status"], "building")
         self.assertEqual(self.order["bread"], "Honey Oat")
         self.assertEqual(self.order["size"], "6-inch")
-        self.assertEqual(self.order["protein"], "Ham")
+        self.assertEqual(self.order["protein"], "Roast Beef")
         self.assertEqual(self.session["pending"], "cheese")
 
     def test_with_everything_means_all_veggies(self):
@@ -87,10 +88,12 @@ class OneStepOrderTest(ChatbotTestCase):
             chatbot.count_selected_ingredients(self.order),
             chatbot.MAX_ORDER_INGREDIENTS,
         )
-        self.assertEqual(self.order["sauce"], [])
+        #the mayo was asked for by name, so it is kept and one veggie is left out
+        self.assertEqual(self.order["sauce"], ["Mayo"])
+        self.assertEqual(len(self.order["veggies"]), 5)
 
     def test_name_given_before_it_is_asked(self):
-        self.say("italian 6 inch ham")
+        self.say("italian 6 inch turkey")
         self.say("my name is Carson")
         self.assertEqual(self.order["name"], "Carson")
         self.assertEqual(self.session["pending"], "cheese")
@@ -125,10 +128,11 @@ class StepByStepOrderTest(ChatbotTestCase):
 
         self.say("everything except onions")
         self.assertIn("Lettuce", self.order["veggies"])
-        self.assertNotIn("Red Onion", self.order["veggies"])
+        self.assertNotIn("Red onion", self.order["veggies"])
         self.assertEqual(self.session["pending"], "sauce")
 
-        self.say("chipotle and honey mustard")
+        reply = self.say("chipotle and honey mustard")
+        self.assertIn("don't have honey mustard", reply)
         self.assertEqual(self.order["sauce"], ["Chipotle"])
         self.assertEqual(self.session["pending"], "name")
 
@@ -157,7 +161,7 @@ class StepByStepOrderTest(ChatbotTestCase):
         self.assertIn("Honey Oat", reply)
 
     def test_vague_pickup_time_asks_for_specific_time(self):
-        self.say("footlong italian ham, no cheese, no veggies, no sauce, under Aaraan")
+        self.say("footlong italian turkey, no cheese, no veggies, no sauce, under Aaraan")
         reply = self.say("this afternoon")
 
         self.assertEqual(self.session["pending"], "pickup_time")
@@ -174,8 +178,8 @@ class ModifyOrderTest(ChatbotTestCase):
         self.assertEqual(self.order["cheese"], "Cheddar")
 
     def test_instead_of(self):
-        self.say("ham instead of turkey")
-        self.assertEqual(self.order["protein"], "Ham")
+        self.say("chicken instead of turkey")
+        self.assertEqual(self.order["protein"], "Chicken")
 
     def test_remove_veggie(self):
         self.say("no onions")
@@ -208,7 +212,127 @@ class SideQuestionTest(ChatbotTestCase):
 
     def test_menu_question(self):
         reply = self.say("show me the menu")
-        self.assertIn("Pepper Jack", reply)
+        self.assertIn("Provolone", reply)
+
+    def test_contact_details_match_the_site(self):
+        self.assertIn("hello@longstorysub.com", self.say("what is your email"))
+
+    def test_delivery_question(self):
+        self.assertIn("5 km", self.say("can I order delivery?"))
+        self.assertEqual(self.session["status"], "idle")
+
+
+#the menu must stay in step with toppingOptions on the order page
+class MenuMatchesOrderPageTest(ChatbotTestCase):
+    def test_same_items_as_order_page(self):
+        page = Path(__file__).resolve().parents[2] / "client" / "src" / "sections" / "order.tsx"
+        if not page.exists():
+            self.skipTest("client is not available")
+        found = re.findall(r'\{ name: "([^"]+)", color: "[^"]+", category: "([^"]+)"', page.read_text(encoding="utf-8"))
+        page_menu = {}
+        for name, category in found:
+            page_menu.setdefault(category.lower(), []).append(name)
+        chat_menu = {
+            category: [item["name"] for item in items]
+            for category, items in response_database.MENU_ITEMS.items() if category != "size"
+        }
+        self.assertEqual(chat_menu, page_menu)
+
+    def test_baseline_database_is_the_same(self):
+        for field in ("MENU_ITEMS", "UNAVAILABLE_ITEMS", "BUSINESS_INFO"):
+            self.assertEqual(getattr(response_database, field), getattr(response_database_minimal, field))
+
+
+class UnavailableItemTest(ChatbotTestCase):
+    def test_unavailable_item_is_explained_and_asked_again(self):
+        self.say("start an order")
+        self.say("wheat footlong")
+        reply = self.say("ham")
+        self.assertIn("don't have ham", reply)
+        self.assertIn("Turkey, Roast Beef, Chicken", reply)
+        self.assertIsNone(self.order["protein"])
+        self.assertEqual(self.session["pending"], "protein")
+
+    def test_longer_names_do_not_match_real_items(self):
+        self.say("footlong wheat turkey with pepper jack, banana peppers, lettuce and sweet onion sauce")
+        self.assertIsNone(self.order["cheese"])
+        self.assertEqual(self.order["veggies"], ["Lettuce"])
+
+    def test_no_to_an_unavailable_item_changes_nothing(self):
+        self.say("footlong wheat turkey swiss lettuce onions mayo under Carson at noon")
+        self.say("no pickles or onions")
+        self.assertEqual(self.order["veggies"], ["Lettuce"])
+
+    def test_swapping_for_an_unavailable_item_keeps_the_original(self):
+        self.say("footlong wheat turkey swiss lettuce mayo under Carson at noon")
+        reply = self.say("swap swiss for mozzarella")
+        self.assertIn("don't have mozzarella", reply)
+        self.assertIn("Provolone", reply)
+        self.assertEqual(self.order["cheese"], "Swiss")
+        self.assertIn("Shall I place the order?", reply)
+
+    def test_delivery_order_is_told_it_is_pickup(self):
+        reply = self.say("footlong wheat turkey for delivery")
+        self.assertIn("for pickup", reply)
+        self.assertIsNone(self.order["name"])
+        self.assertEqual(self.order["protein"], "Turkey")
+
+
+class PortionLimitTest(ChatbotTestCase):
+    def test_left_out_items_are_mentioned(self):
+        reply = self.say("turkey swiss footlong on wheat with everything")
+        self.assertIn("left out Black olives", reply)
+        self.assertNotIn("all veggies", reply)
+        reply = self.say("ranch")
+        self.assertIn("left out Ranch", reply)
+
+    def test_everything_does_not_replace_named_items(self):
+        self.say("turkey swiss footlong on wheat with everything")
+        self.assertEqual(self.order["bread"], "Wheat")
+        self.assertEqual(self.order["size"], "Footlong")
+        self.assertEqual(self.order["protein"], "Turkey")
+        self.assertEqual(self.order["cheese"], "Swiss")
+        self.assertEqual(len(self.order["veggies"]), 5)
+
+    def test_removing_a_veggie_does_not_answer_the_cheese_question(self):
+        self.say("footlong wheat turkey lettuce cucumber")
+        self.assertEqual(self.session["pending"], "cheese")
+        self.say("no cucumber")
+        self.assertEqual(self.order["veggies"], ["Lettuce"])
+        self.assertIsNone(self.order["cheese"])
+        self.assertEqual(self.session["pending"], "cheese")
+
+    def test_no_notice_when_everything_fits(self):
+        reply = self.say("turkey footlong on wheat with everything")
+        self.assertIn("all veggies", reply)
+        self.assertNotIn("left out", reply)
+
+
+class PickupHoursTest(ChatbotTestCase):
+    def setUp(self):
+        super().setUp()
+        self.say("footlong wheat turkey, no cheese, no veggies, no sauce, under Carson")
+
+    def test_closed_times_are_refused(self):
+        for closed in ("3 am", "at 11pm", "8:30am", "25:99", "9:01 pm"):
+            reply = self.say(closed)
+            self.assertIn("between 9 AM and 9 PM", reply, closed)
+            self.assertIsNone(self.order["pickup_time"], closed)
+            self.assertEqual(self.session["pending"], "pickup_time", closed)
+
+    def test_open_times_are_accepted(self):
+        for open_time in ("9 am", "9pm", "noon", "12:30", "5", "ASAP"):
+            self.order["pickup_time"] = None
+            self.session["pending"] = "pickup_time"
+            self.session["status"] = "building"
+            self.say(open_time)
+            self.assertIsNotNone(self.order["pickup_time"], open_time)
+
+    def test_changing_to_a_closed_time_keeps_the_agreed_time(self):
+        self.say("12:30")
+        reply = self.say("make it at 11 pm")
+        self.assertEqual(self.order["pickup_time"], "12:30")
+        self.assertIn("kept your pickup at 12:30", reply)
 
 
 class AccountOrderTest(ChatbotTestCase):

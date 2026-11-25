@@ -36,6 +36,16 @@ Removed because they only applied to reservations or deliveries: `extract_party_
 - New endpoints: `/api/chat/reset`, `/api/session`, `/api/menu`, `/api/orders` (see `API.md`).
 - `/api/chat` takes a `session_id` and returns the order state next to `reply`. Bad input returns `400` (it used to return `200` with "Server error" as the reply).
 
+### Menu and dialog matched to the site
+- `MENU_ITEMS` lists exactly the items on the order page, with the same names (checked by `MenuMatchesOrderPageTest`). Prices are unchanged.
+- New `UNAVAILABLE_ITEMS`: common ingredients the shop does not have. `extract_order_items()` matches them with `available: False`, so the bot says "Sorry, we don't have ham" and lists what it has, and "banana peppers" no longer matches "Green peppers". Swapping for an unavailable item keeps the original.
+- Pickup times outside 9 AM – 9 PM are refused (`is_open_at()`). "ASAP" is always accepted, because the server does not know the shop's time zone.
+- New `delivery` sub-intent: delivery questions get the delivery area and hours. Chat orders are still pickup only, and the bot says so.
+- When the 8-portion limit leaves an ingredient out, the bot names it instead of dropping it silently.
+- "Everything" / "all veggies" is applied after the named ingredients, so it no longer pushes out the bread, meat or cheese. The size no longer counts towards the limit.
+- "no cucumber" while another step is pending no longer also answers "no" to that step.
+- `build_notice()` puts these messages in front of the next question or the review.
+
 ## Minor changes
 
 - `extract_name()`: also skips "is" ("my name is Carson"). Names are additionally checked against `NON_NAME_WORDS` (ingredients, keywords, stop words) so that "for pickup" or "for lunch" is not saved as a name. When the bot has just asked for the name, a plain reply ("Carson") is accepted.
@@ -43,7 +53,7 @@ Removed because they only applied to reservations or deliveries: `extract_party_
 - `is_time_value()`: accepts "12:30 pm".
 - Menu reply is now a text list of ingredients. The `resource/menu.png` image reply was dropped.
 - `RESERVATION_FIELD_KEYWORDS` → `ORDER_FIELD_KEYWORDS` (name and time only). New `ORDER_KEYWORDS` (category, negation, swap, confirm, cancel words). `MENU_ITEMS` is now the ingredient catalog, with aliases.
-- `BUSINESS_INFO` text and `build_guess_message()` reworded for a sub shop. **Hours, address, phone and email are still placeholders.**
+- `BUSINESS_INFO` text and `build_guess_message()` reworded for a sub shop. Hours, locations, phone and email match the About page.
 - `booking_store.py` → `db/order_store.py` (`save_order`, `load_orders`), saving to `db/data/orders.jsonl`.
 
 ## Unchanged

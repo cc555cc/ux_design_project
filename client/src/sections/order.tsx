@@ -49,6 +49,7 @@ import staffHelper from "../assets/sandwich-shop-employee-male_transparent.png"
 
 const productOptions = ["Bread", "Protein", "Cheese", "Veggies", "Sauce"] as const
 type ProductOption = (typeof productOptions)[number]
+type OrderMode = "menu" | "voice"
 
 type ToppingOption = {
   name: string
@@ -347,6 +348,7 @@ function titleForCategory(category: ProductOption): string {
 }
 
 function OrderSection() {
+  const [orderMode, setOrderMode] = useState<OrderMode>("menu")
   const [activeCategory, setActiveCategory] = useState<ProductOption>("Bread")
   const user = useAuth((state) => state.user)
   const [toppingAmounts, setToppingAmounts] = useState<ToppingAmounts>(() => ({ ...emptyToppingAmounts }))
@@ -467,22 +469,28 @@ function OrderSection() {
       "What would you like on your sandwich?",
     [chatMessages]
   )
-  // Only the latest exchange is shown: the staff's newest line plus the customer's newest line (if any),
-  // in the order they happened. While a reply is loading, the staff bubble is the "working on it" line.
-  const visibleExchange = useMemo<ChatMessage[]>(() => {
-    const roles = chatMessages.map((message) => message.role)
-    const userIndex = roles.lastIndexOf("user")
-    const staffIndex = roles.lastIndexOf("assistant")
-    const staff: ChatMessage = { role: "assistant", text: chatLoading ? "I’m working on that..." : lastAssistantMessage }
-    if (userIndex < 0) return [staff]
-    const user = chatMessages[userIndex]
-    return chatLoading || staffIndex > userIndex ? [user, staff] : [staff, user]
-  }, [chatMessages, chatLoading, lastAssistantMessage])
+  const conversationMessages = useMemo<ChatMessage[]>(() => {
+    const base: ChatMessage[] =
+      chatMessages.length > 0
+        ? chatMessages
+        : [{ role: "assistant", text: "What would you like on your sandwich?" }]
+    if (chatLoading) {
+      return [...base, { role: "assistant", text: "I’m working on that..." }]
+    }
+    return base
+  }, [chatMessages, chatLoading])
+  const lastAssistantIndex = useMemo(() => {
+    for (let i = conversationMessages.length - 1; i >= 0; i -= 1) {
+      if (conversationMessages[i].role === "assistant") return i
+    }
+    return -1
+  }, [conversationMessages])
   const chatLogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (orderMode !== "voice") return
     const log = chatLogRef.current
     if (log) log.scrollTop = log.scrollHeight
-  }, [visibleExchange])
+  }, [conversationMessages, orderMode])
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0)
   const cartTotal = cartItems.reduce((total, item) => total + item.total, 0)
   const assistantStatus = chatLoading
@@ -733,6 +741,13 @@ function OrderSection() {
     setIsListening(false)
   }
 
+  function switchOrderMode(nextMode: OrderMode) {
+    if (nextMode === "menu" && isListening) {
+      stopListening()
+    }
+    setOrderMode(nextMode)
+  }
+
   function speakLastResponse() {
     if (!("speechSynthesis" in window) || isSpeaking) return
     const utterance = new SpeechSynthesisUtterance(lastAssistantMessage)
@@ -903,7 +918,8 @@ function OrderSection() {
     <section className="order-section">
       <style>{`
         * { box-sizing: border-box; }
-        /* the dark photo sits behind the logo only; on this page the nav links are over the light background */
+        /* Keep the top navbar a single solid colour across the entire order page */
+        body:has(.order-section) nav { background-color: #e4e8e5; border-bottom: 1px solid rgba(31, 35, 33, 0.1); }
         body:has(.order-section) nav a.text-white { color: #111; }
         body:has(.order-section) nav a.text-white:hover { color: var(--color-red-600, #dc2626); }
 
@@ -945,29 +961,23 @@ function OrderSection() {
 
         /* no frame: the panels sit straight on the chalk background */
         .order-card { height: 100%; display: flex; flex-direction: column; }
-        .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.38fr 1fr; gap: 18px; }
+        .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.28fr 1fr; gap: 18px; }
         /* container-type lets .image-stage size itself from this column's width (cqw units) */
-        .product-panel { background: transparent; padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; container-type: inline-size; }
+        .product-panel { background: transparent; padding: calc(10vh + 14px) 0 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; container-type: inline-size; }
         .panel-label { display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; margin-bottom: 6px; }
         .panel-label .mini-pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; background: var(--surface-raised); }
         .start-over-button { border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 10px; background: rgba(20, 17, 16, 0.6); color: #fff; font-size: 0.66rem; font-weight: 700; text-transform: none; letter-spacing: normal; cursor: pointer; }
         .start-over-button:hover:not(:disabled) { background: rgba(20, 17, 16, 0.8); }
         .start-over-button:disabled { opacity: 0.5; cursor: not-allowed; }
         .product-panel h1 { margin: 4px 0 0; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.05; letter-spacing: -0.06em; font-weight: 700; color: var(--text); }
-        /* The photo (1536×1024) is drawn at the column's full width and shifted up 8.724cqw, which always
-           hides its top ~13% (the pendant lamps). The stage's height then decides how much of the
-           countertop at the bottom is shown: 52cqw ends just under the board.
-           On short screens it gives up height first (flex-shrink 20 vs the chat's 1). */
-        .image-stage { flex: 0 20 52cqw; min-height: 220px; margin: 6px 0 0; border-radius: 18px 18px 0 0; background-color: #3a2f28; background-size: 100% auto; background-position: center -8.724cqw; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2); padding: 16px 16px 34px; display: flex; flex-direction: column; justify-content: flex-end; }
-        /* sits in the 34px strip under the board instead of taking its own row */
-        .image-stage > .preview-meta { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); margin: 0; z-index: 1; white-space: nowrap; }
-        /* navbar logo box spans 8px → (10vh - 8px) from the viewport top; the stage starts 6px down */
+        /* Full-height stage lowered below the single-colour header; board sits low on the wooden counter */
+        .image-stage { flex: 1 1 auto; min-height: 280px; margin: 0; border-radius: 18px; background-color: #3a2f28; background-size: cover; background-position: center bottom; background-repeat: no-repeat; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2), 0 14px 32px rgba(31, 35, 33, 0.14); padding: 16px 16px 26px; display: flex; flex-direction: column; justify-content: flex-end; }
+        /* sits in the strip under the board instead of taking its own row */
+        .image-stage > .preview-meta { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); margin: 0; z-index: 1; white-space: nowrap; }
         .stage-heading { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
         .stage-heading > * { pointer-events: auto; }
-        .stage-heading .panel-label { position: absolute; top: calc(5vh - 6px); right: 18px; transform: translateY(-50%); margin: 0; gap: 10px; justify-content: flex-end; color: #fff; text-shadow: 0 1px 6px rgba(30, 20, 12, 0.7); }
-        /* logo img is (10vh - 24px) tall at a 560:470 ratio inside a box starting 24px from the viewport edge;
-           its right edge lands ~11.92vh from the stage's left edge, so the heading starts 16px past that */
-        .product-panel .stage-heading h1 { position: absolute; top: calc(5vh - 6px); left: calc(11.92vh + 16px); transform: translateY(-50%); margin: 0; white-space: nowrap; color: #fff; text-shadow: 0 2px 10px rgba(30, 20, 12, 0.55); }
+        .stage-heading .panel-label { position: absolute; top: 18px; right: 18px; margin: 0; gap: 10px; justify-content: flex-end; color: #fff; text-shadow: 0 1px 6px rgba(30, 20, 12, 0.7); }
+        .product-panel .stage-heading h1 { position: absolute; top: 14px; left: 20px; margin: 0; white-space: nowrap; color: #fff; text-shadow: 0 2px 10px rgba(30, 20, 12, 0.55); }
         /* The stack is built bottom-up (column-reverse) so each higher layer paints over the one below.
            Layers overlap via negative margins, worked out from each PNG's measured food edges
            (percentages resolve against .sandwich-build's width):
@@ -976,9 +986,8 @@ function OrderSection() {
         .sandwich-build { width: min(460px, 62%); margin: 0 auto; display: flex; flex-direction: column-reverse; align-items: center; }
         /* margin-bottom tucks away the transparent strip under the board (117 of the PNG's 512px = 7.62% of its width) */
         .sandwich-build > .plate { transform: scaleX(1.1); width: 100%; height: auto; margin-top: -15%; margin-bottom: -7.62%; pointer-events: none; filter: drop-shadow(0 10px 12px rgba(40, 26, 17, 0.25)); }
-        /* the stretch of counter right of the board. --free is its width: half of what the board
-           (1.1 × the .sandwich-build width) leaves over. It starts at the counter's back edge, 34.6cqw down the photo */
-        .sauce-bowls { --free: calc((100cqw - 1.1 * min(460px, 62cqw - 20px)) / 2); position: absolute; right: 0; top: 34.6cqw; bottom: 0; width: var(--free); pointer-events: none; }
+        /* the stretch of counter right of the board, anchored low on the wooden countertop */
+        .sauce-bowls { --free: calc((100cqw - 1.1 * min(460px, 62cqw - 20px)) / 2); position: absolute; right: 0; bottom: 12px; height: clamp(115px, 24%, 195px); width: var(--free); pointer-events: none; }
         .sauce-bowls img { position: absolute; width: min(calc(var(--free) * 0.56), 125px); height: auto; filter: drop-shadow(0 6px 5px rgba(40, 26, 17, 0.35)); }
         /* zig-zag from back to front, so no bowl hides another's sauce */
         .sauce-bowls img:nth-child(1) { left: 4%; bottom: 58%; }
@@ -1017,7 +1026,7 @@ function OrderSection() {
         }
         .preview-meta {
           margin: 8px auto 0;
-          padding: 3px 10px;
+          padding: 4px 12px;
           width: fit-content;
           border-radius: 999px;
           background: rgba(20, 17, 16, 0.72);
@@ -1026,9 +1035,20 @@ function OrderSection() {
           color: #fff;
         }
 
-        .builder-panel { background: transparent; padding: calc(10vh + 20px) 18px 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .builder-panel { background: transparent; padding: calc(10vh + 14px) 18px 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .mode-switcher { position: relative; flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin-bottom: 12px; border-radius: 999px; background: var(--surface-raised); border: 1px solid var(--line); box-shadow: 0 4px 12px rgba(31, 35, 33, 0.06); }
+        .mode-tab { border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); padding: 9px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+        .mode-tab:hover { color: var(--text); }
+        .mode-tab.active { background: var(--text); color: var(--bg); box-shadow: 0 4px 10px rgba(31, 35, 33, 0.2); }
+        .mode-tab svg { width: 15px; height: 15px; flex: none; }
+        .mode-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulseDot 1.2s ease-in-out infinite; }
+        @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.75); } }
+
+        .mode-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+        .mode-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
         .builder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .builder-title { margin: 0; font-size: clamp(1.5rem, 2vw, 2.3rem); line-height: 1.1; letter-spacing: -0.05em; font-weight: 700; color: var(--text); }
+        .builder-title { margin: 0; font-size: clamp(1.5rem, 2vw, 2.2rem); line-height: 1.1; letter-spacing: -0.05em; font-weight: 700; color: var(--text); }
         .builder-tabs { display: flex; gap: 10px; list-style: none; margin: 0 0 10px; padding: 0; flex-wrap: wrap; }
         .tab-button { border: 1px solid var(--line); border-radius: 999px; color: var(--text-muted); background: var(--surface-raised); font-size: 0.75rem; font-weight: 600; padding: 8px 14px; cursor: pointer; transition: all 0.2s ease; }
         .tab-button:hover { color: var(--text); background: var(--surface-hover); }
@@ -1069,51 +1089,49 @@ function OrderSection() {
         .size-button.active { color: var(--bg); background: var(--text); border-color: var(--text); }
 
         .order-column { flex: none; margin-top: 12px; }
-        /* sits under the counter photo; fills leftover height on tall screens, scrolls inside itself if squeezed */
-        /* sits under the counter photo: the conversation on the left, the staff member on the right.
-           Fills leftover height on tall screens; if squeezed, only the conversation side scrolls. */
-        /* same width as the counter photo and runs flush to the bottom edge of the screen (square bottom corners) */
-        .chat-panel { flex: 1 1 auto; min-height: 0; margin: 12px 0 0; background: var(--surface-raised); border: 1px solid var(--line); border-bottom: none; border-radius: 16px 16px 0 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) clamp(130px, 28%, 210px); grid-template-rows: minmax(0, 1fr); }
-        .chat-display { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; padding: 12px 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
-        /* margin-top: auto pushes the controls, and everything after them (heard card, help, privacy), to the bottom */
-        .chat-controls { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .chat-controls .chat-form { flex: 1 1 260px; }
-        .chat-kicker { margin: 0; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
-        /* the bubble hugs the staff side; its square bottom-right corner points at them */
-        /* fills the free space between the heading and the controls; transparent so only the bubbles show */
-        /* vertical scrolling only: overflow-x is hidden so nothing can cause a sideways scrollbar */
-        .chat-log { flex: 1 1 0; min-height: 70px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; background: transparent; display: flex; flex-direction: column; gap: 12px; padding: 4px 0 6px; }
-        .speech { flex: none; align-self: flex-end; margin-right: 0; position: relative; background: var(--field); border: 2px solid var(--text); border-radius: 18px 18px 0 18px; padding: 10px 16px 8px; max-width: min(440px, 100%); overflow-wrap: anywhere; box-shadow: 0 8px 18px var(--shadow); }
-        .speech p { margin: 0; font-size: 0.9rem; line-height: 1.4; color: var(--text); }
+
+        /* Chat popup panel that swaps in place of the ingredient menu on the right */
+        .chat-popup { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 14px 30px rgba(31, 35, 33, 0.11); overflow: hidden; }
+        .chat-popup-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(175px, 40%, 240px); grid-template-rows: minmax(0, 1fr); }
+        .chat-conversation { min-width: 0; min-height: 0; padding: 12px 6px 10px 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+        .chat-kicker { flex: none; margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+        .chat-staff { position: relative; min-height: 220px; background: radial-gradient(ellipse 85% 55% at 50% 100%, rgba(214, 42, 42, 0.12), transparent 72%); }
+        .chat-staff img { position: absolute; inset: 0; width: 100%; height: 100%; padding-top: 8px; object-fit: contain; object-position: center bottom; transform-origin: 50% 100%; filter: drop-shadow(0 6px 10px rgba(31, 35, 33, 0.18)); pointer-events: none; }
+        .chat-staff.processing img { animation: staffBob 1.4s ease-in-out infinite; }
+        @keyframes staffBob { 50% { transform: translateY(-4px) rotate(-1deg); } }
+        .avatar-status { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 14px); width: max-content; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 2px 8px var(--shadow); font-size: 0.64rem; font-weight: 700; line-height: 1.25; color: var(--text); text-align: center; }
+        .chat-staff.error .avatar-status { color: var(--danger); box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.25); }
+
+        .chat-log { flex: 1 1 0; min-height: 90px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; background: transparent; display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 6px; }
+        .speech { flex: none; align-self: flex-end; margin-right: 0; position: relative; background: var(--field); border: 2px solid var(--text); border-radius: 18px 18px 0 18px; padding: 10px 14px 8px; max-width: 100%; overflow-wrap: anywhere; box-shadow: 0 6px 14px var(--shadow); }
+        .speech p { margin: 0; font-size: 0.86rem; line-height: 1.4; color: var(--text); }
         /* the customer's bubble: dark, on the left, square bottom-left corner */
         .speech.from-user { align-self: flex-start; margin: 0; background: var(--text); border-color: var(--text); border-radius: 18px 18px 18px 0; }
         .speech.from-user p { color: var(--bg); }
-        .speech .tiny { font-size: 0.7rem; opacity: 0.85; margin-top: 8px; color: var(--text-muted); }
-        /* the cut-out (446×669) ends at the waist, so it's pinned to the panel's bottom edge like someone
-           standing behind the counter; "contain" keeps the whole figure visible at any panel height */
-        .chat-staff { position: relative; min-height: 200px; background: radial-gradient(ellipse 85% 55% at 50% 100%, rgba(214, 42, 42, 0.12), transparent 72%); }
-        .chat-staff img { position: absolute; inset: 0; width: 100%; height: 100%; padding-top: 10px; object-fit: contain; object-position: center bottom; transform-origin: 50% 100%; filter: drop-shadow(0 6px 10px rgba(31, 35, 33, 0.18)); pointer-events: none; }
-        .chat-staff.processing img { animation: staffBob 1.4s ease-in-out infinite; }
-        @keyframes staffBob { 50% { transform: translateY(-4px) rotate(-1deg); } }
-        .avatar-status { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 16px); width: max-content; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); box-shadow: 0 2px 8px var(--shadow); font-size: 0.62rem; font-weight: 700; line-height: 1.3; color: var(--text); text-align: center; }
-        .chat-staff.error .avatar-status { color: var(--danger); box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.25); }
-        .chat-error { font-size: 0.72rem; color: var(--danger); }
+        .speech .tiny { font-size: 0.68rem; opacity: 0.85; margin-top: 6px; color: var(--text-muted); }
+        .chat-footer { flex: none; padding: 10px 14px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+        .chat-controls { flex: none; display: flex; flex-direction: column; gap: 8px; }
+        .chat-error { flex: none; font-size: 0.72rem; color: var(--danger); }
         .retry-button { border: 0; background: transparent; color: var(--danger); font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0 0 0 4px; }
         .chat-form { display: flex; gap: 8px; }
-        .chat-input { flex: 1; border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 12px; font-size: 0.75rem; background: var(--field); color: var(--text); }
+        .chat-input { flex: 1; border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 13px; font-size: 0.76rem; background: var(--field); color: var(--text); }
         .chat-input::placeholder, .checkout-input::placeholder { color: var(--text-faint); }
-        .chat-send { border: 0; border-radius: 999px; background: var(--text); color: var(--bg); font-size: 0.7rem; font-weight: 700; padding: 8px 12px; cursor: pointer; }
+        .chat-send { border: 0; border-radius: 999px; background: var(--text); color: var(--bg); font-size: 0.72rem; font-weight: 700; padding: 8px 14px; cursor: pointer; }
         .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
-        .voice-controls { display: flex; align-items: center; gap: 6px; }
-        .voice-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text); padding: 7px 10px; font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .voice-controls { display: flex; align-items: center; gap: 8px; }
+        .voice-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text); padding: 8px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease; }
+        .voice-button svg { width: 14px; height: 14px; flex: none; }
         .voice-button:hover:not(:disabled) { background: var(--surface-hover); }
         .voice-button:disabled { opacity: 0.48; cursor: not-allowed; }
-        .heard-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); font-size: 0.7rem; color: var(--text-muted); }
+        .voice-button.primary { flex: 1; border-color: transparent; background: var(--text); color: var(--bg); }
+        .voice-button.primary:hover:not(:disabled) { background: #313734; }
+        .voice-button.primary.listening { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(214, 42, 42, 0.22); }
+        .voice-button.primary.listening:hover:not(:disabled) { background: var(--accent-hover); }
+        .heard-card { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); font-size: 0.7rem; color: var(--text-muted); }
         .heard-card strong { display: block; margin-bottom: 2px; color: var(--text); }
         .heard-actions { display: flex; gap: 5px; }
-        .platform-note { margin: 0; font-size: 0.62rem; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
-        .chat-help { margin: 4px 0 0; font-size: 0.66rem; line-height: 1.35; color: var(--text-muted); }
-        .privacy-note { margin: 0; font-size: 0.62rem; line-height: 1.4; color: var(--text-faint); }
+        .chat-help { flex: none; margin: 0; font-size: 0.66rem; line-height: 1.35; color: var(--text-muted); }
+        .privacy-note { flex: none; margin: 0; font-size: 0.62rem; line-height: 1.35; color: var(--text-faint); }
 
         .order-summary { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         .summary-meta { color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -1144,28 +1162,28 @@ function OrderSection() {
         /* single column on narrow screens: too much to fit in one screen, so the page scrolls normally again */
         @media (max-width: 980px) {
           .order-section { height: auto; min-height: 100vh; overflow: visible; padding-bottom: 18px; }
-          .chat-panel { border-bottom: 1px solid var(--line); border-radius: 16px; }
           .order-shell, .order-card { height: auto; }
           .layout { grid-template-columns: 1fr; }
-          .product-panel { overflow: visible; }
-          .image-stage { flex: none; aspect-ratio: 1536 / 800; min-height: 0; }
-          .chat-display { overflow-y: visible; }
-          .chat-log { flex: none; overflow-y: visible; }
-          .builder-panel { padding-top: 20px; overflow: visible; }
+          .product-panel { padding: calc(10vh + 12px) 0 0; overflow: visible; }
+          .image-stage { flex: none; aspect-ratio: 1536 / 900; min-height: 260px; margin: 0; }
+          .builder-panel { padding-top: 16px; overflow: visible; }
+          .mode-stage, .mode-panel { overflow: visible; }
           .topping-grid { overflow: visible; }
+          .chat-popup { min-height: 440px; max-height: 70vh; }
         }
 
         @media (max-width: 700px) {
-          .product-panel .stage-heading h1 { top: calc(10vh + 2px); left: 18px; transform: none; }
+          .product-panel .stage-heading h1 { top: 44px; left: 16px; }
           .builder-tabs { justify-content: center; }
           .topping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .summary-main { flex-direction: column; align-items: flex-start; }
-          .chat-panel { grid-template-columns: minmax(0, 1fr) 110px; }
+          .chat-popup-body { grid-template-columns: minmax(0, 1fr) 130px; }
+          .voice-controls { flex-wrap: wrap; }
           .checkout-grid { grid-template-columns: 1fr; }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .chat-staff.processing img { animation: none; }
+          .chat-staff.processing img, .mode-live-dot { animation: none; }
           .sandwich-stack { transition: none; }
         }
 `}</style>
@@ -1177,8 +1195,9 @@ function OrderSection() {
               <div
                 className="image-stage"
                 aria-label="Live sandwich preview"
-                data-nav-theme="dark"
-                style={{ backgroundImage: `url(${assemblecounter})` }}
+                style={{
+                  backgroundImage: `linear-gradient(to bottom, rgba(20, 14, 10, 0.52) 0%, rgba(20, 14, 10, 0) 24%), url(${assemblecounter})`,
+                }}
               >
                 <div className="stage-heading">
                   <div className="panel-label">
@@ -1249,213 +1268,291 @@ function OrderSection() {
                 </div>
                 <div className="preview-meta">
                   {previewPortionCount === 0 && !hasBread
-                    ? "Select toppings to build your sandwich"
-                    : `${previewPortionCount} ingredient portion${previewPortionCount === 1 ? "" : "s"} selected`}
-                </div>
-              </div>
-              <div className="chat-panel" aria-label="Order chatbot">
-                {/* left: the conversation · right: the staff member you're talking to */}
-                <div className="chat-display">
-                  <p className="chat-kicker">A little help from the counter.</p>
-                  {/* see-through, scrollable conversation box: customer bubbles on the left, staff bubbles on the right */}
-                  <div className="chat-log" ref={chatLogRef} role="log" aria-live="polite">
-                    {visibleExchange.map((message, index) =>
-                      message.role === "user" ? (
-                        <div key={`user-${index}`} className="speech from-user">
-                          <p>{message.text}</p>
-                        </div>
-                      ) : (
-                        <div key={`staff-${index}`} className="speech">
-                          <p>{message.text}</p>
-                          <div className="tiny">{selectedNames.length > 0 ? selectedNames.join(", ") : "Pick ingredients to start."}</div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                  {chatError ? (
-                    <div className="chat-error" role="alert">
-                      {chatError}
-                      {lastFailedMessage ? (
-                        <button type="button" className="retry-button" onClick={() => void sendChatMessage(lastFailedMessage)}>
-                          Retry
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {/* sits right above the message box so it is never pushed out of view */}
-                  {heardText ? (
-                    <div className="heard-card" role="status">
-                      <div>
-                        <strong>I heard:</strong>
-                        <span>{heardText}</span>
-                      </div>
-                      <div className="heard-actions">
-                        <button
-                          type="button"
-                          className="voice-button"
-                          onClick={startListening}
-                          disabled={isListening || chatLoading}
-                        >
-                          Try again
-                        </button>
-                        <button
-                          type="button"
-                          className="voice-button"
-                          onClick={() => void sendChatMessage(heardText)}
-                          disabled={chatLoading || !heardText.trim()}
-                        >
-                          Use this
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="chat-controls">
-                    <form
-                      className="chat-form"
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        void sendChatMessage()
-                      }}
-                    >
-                      <input
-                        aria-label="Order message"
-                        className="chat-input"
-                        value={chatInput}
-                        onChange={(event) => setChatInput(event.target.value)}
-                        placeholder="Type your order update..."
-                        disabled={chatLoading}
-                      />
-                      <button type="submit" className="chat-send" disabled={chatLoading || chatInput.trim().length === 0}>
-                        {chatLoading ? "Sending..." : "Send"}
-                      </button>
-                    </form>
-                    <div className="voice-controls" aria-label="Voice controls">
-                      <button
-                        type="button"
-                        className="voice-button"
-                        onClick={isListening ? stopListening : startListening}
-                        disabled={!voiceSupported || chatLoading}
-                        aria-pressed={isListening}
-                      >
-                        {isListening ? "Stop listening" : voiceSupported ? "Start listening" : "Voice unavailable"}
-                      </button>
-                      <button
-                        type="button"
-                        className="voice-button"
-                        onClick={isSpeaking ? stopSpeaking : speakLastResponse}
-                        disabled={!lastAssistantMessage}
-                      >
-                        {isSpeaking ? "Stop speaking" : "Hear response"}
-                      </button>
-                    </div>
-                  </div>
-                  <p className="chat-help">
-                    Try: “Wheat bread with turkey, cheddar, lettuce, and mayo.” To correct it, say “remove the turkey” or “change to chicken.”
-                    {!voiceSupported ? " Voice input is unavailable in this browser; text input works normally." : ""}
-                  </p>
-                  <p className="privacy-note">
-                    Privacy: this screen sends only order details needed for your sub, such as ingredients, name, and pickup time. Avoid adding payment or contact information here.
-                  </p>
-                </div>
-                <div
-                  className={`chat-staff${chatLoading || isListening || isSpeaking ? " processing" : chatError ? " error" : ""}`}
-                >
-                  <img src={staffHelper} alt="Long Story Sub staff member helping with your order" />
-                  <span className="avatar-status" role="status">{assistantStatus}</span>
+                    ? "Select toppings or switch to Voice & Chat"
+                    : `${sandwichSize} · ${previewPortionCount} ingredient portion${previewPortionCount === 1 ? "" : "s"} selected`}
                 </div>
               </div>
             </div>
 
             <div className="builder-panel">
-              <div className="builder-header">
-                <h2 className="builder-title">{titleForCategory(activeCategory)}</h2>
+              <div className="mode-switcher" role="tablist" aria-label="Ordering mode">
+                <button
+                  id="mode-tab-menu"
+                  type="button"
+                  role="tab"
+                  aria-selected={orderMode === "menu"}
+                  aria-controls="mode-panel-menu"
+                  className={`mode-tab${orderMode === "menu" ? " active" : ""}`}
+                  onClick={() => switchOrderMode("menu")}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                  </svg>
+                  <span>Build Menu</span>
+                </button>
+                <button
+                  id="mode-tab-voice"
+                  type="button"
+                  role="tab"
+                  aria-selected={orderMode === "voice"}
+                  aria-controls="mode-panel-voice"
+                  className={`mode-tab${orderMode === "voice" ? " active" : ""}`}
+                  onClick={() => switchOrderMode("voice")}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                  <span>Voice &amp; Chat</span>
+                  {isListening || chatLoading || isSpeaking ? (
+                    <span className="mode-live-dot" aria-hidden="true" />
+                  ) : null}
+                </button>
               </div>
 
-              <ul className="builder-tabs" aria-label="Build options">
-                {productOptions.map((option) => (
-                  <li key={option}>
-                    <button
-                      type="button"
-                      className={`tab-button${activeCategory === option ? " active" : ""}`}
-                      onClick={() => setActiveCategory(option)}
-                    >
-                      {option}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="topping-grid">
-                {visibleToppings.map((topping) => {
-                  const amount = toppingAmounts[topping.name] ?? 0
-                  const isSelected = amount > 0
-                  return (
-                    <div
-                      key={topping.name}
-                      className={`topping-item${isSelected ? " selected" : ""}`}
-                    >
-                      <div className={`topping-swatch${topping.icon ? " cutout" : ""}${topping.category === "Sauce" ? " bowl" : ""}${topping.photoZoom ? " photo" : ""}`} style={{ "--photo-zoom": topping.photoZoom } as CSSProperties} aria-hidden="true">
-                        <img src={topping.icon ?? topping.image} alt="" loading="lazy" />
-                      </div>
-                      <div className="topping-stepper" aria-label={`${topping.name} quantity`}>
-                        <button
-                          type="button"
-                          onClick={() => adjustToppingAmount(topping.name, -1)}
-                          disabled={amount === 0}
-                          aria-label={`Remove one portion of ${topping.name}`}
-                        >
-                          −
-                        </button>
-                        <span className="amount" aria-live="polite">{amount}</span>
-                        <button
-                          type="button"
-                          onClick={() => adjustToppingAmount(topping.name, 1)}
-                          disabled={amount === 3 || selectedIngredientCount >= maxIngredientPortions}
-                          aria-label={`Add one portion of ${topping.name}`}
-                        >
-                          +
-                        </button>
-                      </div>
-                      <div className="name">{topping.name}</div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="builder-summary">
-                <div className="builder-summary-left">
-                  <span>{selectedNames.slice(0, 3).join(" · ") || "No ingredients selected"}</span>
-                  <button
-                    type="button"
-                    className="undo-button"
-                    onClick={undoLastChange}
-                    disabled={!undoSnapshot}
+              <div className="mode-stage">
+                {orderMode === "menu" ? (
+                  <div
+                    id="mode-panel-menu"
+                    role="tabpanel"
+                    aria-labelledby="mode-tab-menu"
+                    className="mode-panel"
                   >
-                    Undo
-                  </button>
-                </div>
-                <span className="summary-pill">
-                  <strong>{selectedIngredientCount} / {maxIngredientPortions}</strong> portions
-                </span>
-              </div>
-              <div className="size-picker" aria-label="Sandwich size">
-                {["6-inch", "Footlong"].map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    className={`size-button${sandwichSize === size ? " active" : ""}`}
-                    onClick={() => setSandwichSize(size)}
-                    aria-pressed={sandwichSize === size}
+                      <div className="builder-header">
+                        <h2 className="builder-title">{titleForCategory(activeCategory)}</h2>
+                      </div>
+
+                      <ul className="builder-tabs" aria-label="Build options">
+                        {productOptions.map((option) => (
+                          <li key={option}>
+                            <button
+                              type="button"
+                              className={`tab-button${activeCategory === option ? " active" : ""}`}
+                              onClick={() => setActiveCategory(option)}
+                            >
+                              {option}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div className="topping-grid">
+                        {visibleToppings.map((topping) => {
+                          const amount = toppingAmounts[topping.name] ?? 0
+                          const isSelected = amount > 0
+                          return (
+                            <div
+                              key={topping.name}
+                              className={`topping-item${isSelected ? " selected" : ""}`}
+                            >
+                              <div className={`topping-swatch${topping.icon ? " cutout" : ""}${topping.category === "Sauce" ? " bowl" : ""}${topping.photoZoom ? " photo" : ""}`} style={{ "--photo-zoom": topping.photoZoom } as CSSProperties} aria-hidden="true">
+                                <img src={topping.icon ?? topping.image} alt="" loading="lazy" />
+                              </div>
+                              <div className="topping-stepper" aria-label={`${topping.name} quantity`}>
+                                <button
+                                  type="button"
+                                  onClick={() => adjustToppingAmount(topping.name, -1)}
+                                  disabled={amount === 0}
+                                  aria-label={`Remove one portion of ${topping.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="amount" aria-live="polite">{amount}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => adjustToppingAmount(topping.name, 1)}
+                                  disabled={amount === 3 || selectedIngredientCount >= maxIngredientPortions}
+                                  aria-label={`Add one portion of ${topping.name}`}
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <div className="name">{topping.name}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      <div className="builder-summary">
+                        <div className="builder-summary-left">
+                          <span>{selectedNames.slice(0, 3).join(" · ") || "No ingredients selected"}</span>
+                          <button
+                            type="button"
+                            className="undo-button"
+                            onClick={undoLastChange}
+                            disabled={!undoSnapshot}
+                          >
+                            Undo
+                          </button>
+                        </div>
+                        <span className="summary-pill">
+                          <strong>{selectedIngredientCount} / {maxIngredientPortions}</strong> portions
+                        </span>
+                      </div>
+                      <div className="size-picker" aria-label="Sandwich size">
+                        {["6-inch", "Footlong"].map((size) => (
+                          <button
+                            key={size}
+                            type="button"
+                            className={`size-button${sandwichSize === size ? " active" : ""}`}
+                            onClick={() => setSandwichSize(size)}
+                            aria-pressed={sandwichSize === size}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                  </div>
+                ) : (
+                  <div
+                    id="mode-panel-voice"
+                    role="tabpanel"
+                    aria-labelledby="mode-tab-voice"
+                    className="mode-panel"
                   >
-                    {size}
-                  </button>
-                ))}
+                      <div className="chat-popup" aria-label="Order voice and chat assistant">
+                        <div className="chat-popup-body">
+                          <div className="chat-conversation">
+                            <p className="chat-kicker">A little help from the counter.</p>
+                            <div className="chat-log" ref={chatLogRef} role="log" aria-live="polite">
+                              {conversationMessages.map((message, index) =>
+                                message.role === "user" ? (
+                                  <div key={`user-${index}`} className="speech from-user">
+                                    <p>{message.text}</p>
+                                  </div>
+                                ) : (
+                                  <div key={`staff-${index}`} className="speech">
+                                    <p>{message.text}</p>
+                                    {index === lastAssistantIndex ? (
+                                      <div className="tiny">
+                                        {selectedNames.length > 0 ? selectedNames.join(", ") : "Pick or say ingredients to start."}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`chat-staff${chatLoading || isListening || isSpeaking ? " processing" : chatError ? " error" : ""}`}
+                          >
+                            <img src={staffHelper} alt="Long Story Sub staff member helping with your order" />
+                            <span className="avatar-status" role="status">
+                              {isListening || chatLoading || isSpeaking ? (
+                                <span className="mode-live-dot" aria-hidden="true" />
+                              ) : null}
+                              {assistantStatus}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="chat-footer">
+                          {chatError ? (
+                            <div className="chat-error" role="alert">
+                              {chatError}
+                              {lastFailedMessage ? (
+                                <button type="button" className="retry-button" onClick={() => void sendChatMessage(lastFailedMessage)}>
+                                  Retry
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {heardText ? (
+                            <div className="heard-card" role="status">
+                              <div>
+                                <strong>I heard:</strong>
+                                <span>{heardText}</span>
+                              </div>
+                              <div className="heard-actions">
+                                <button
+                                  type="button"
+                                  className="voice-button"
+                                  onClick={startListening}
+                                  disabled={isListening || chatLoading}
+                                >
+                                  Try again
+                                </button>
+                                <button
+                                  type="button"
+                                  className="voice-button"
+                                  onClick={() => void sendChatMessage(heardText)}
+                                  disabled={chatLoading || !heardText.trim()}
+                                >
+                                  Use this
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="chat-controls">
+                            <div className="voice-controls" aria-label="Voice controls">
+                              <button
+                                type="button"
+                                className={`voice-button primary${isListening ? " listening" : ""}`}
+                                onClick={isListening ? stopListening : startListening}
+                                disabled={!voiceSupported || chatLoading}
+                                aria-pressed={isListening}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                  <line x1="12" x2="12" y1="19" y2="22" />
+                                </svg>
+                                {isListening ? "Stop listening" : voiceSupported ? "Start voice order" : "Voice unavailable"}
+                              </button>
+                              <button
+                                type="button"
+                                className="voice-button"
+                                onClick={isSpeaking ? stopSpeaking : speakLastResponse}
+                                disabled={!lastAssistantMessage}
+                              >
+                                {isSpeaking ? "Stop speaking" : "Hear response"}
+                              </button>
+                            </div>
+                            <form
+                              className="chat-form"
+                              onSubmit={(event) => {
+                                event.preventDefault()
+                                void sendChatMessage()
+                              }}
+                            >
+                              <input
+                                aria-label="Order message"
+                                className="chat-input"
+                                value={chatInput}
+                                onChange={(event) => setChatInput(event.target.value)}
+                                placeholder="Or type your order update..."
+                                disabled={chatLoading}
+                              />
+                              <button type="submit" className="chat-send" disabled={chatLoading || chatInput.trim().length === 0}>
+                                {chatLoading ? "Sending..." : "Send"}
+                              </button>
+                            </form>
+                          </div>
+
+                          <p className="chat-help">
+                            Try: “Wheat bread with turkey, cheddar, lettuce, and mayo.” To edit, say “remove the turkey” or “change to chicken.”
+                            {!voiceSupported ? " Voice input is unavailable in this browser; text input works normally." : ""}
+                          </p>
+                          <p className="privacy-note">
+                            Privacy: only sandwich order details (ingredients, name, pickup time) are sent. Avoid payment or contact info.
+                          </p>
+                        </div>
+                      </div>
+                  </div>
+                )}
               </div>
+
               <div className="order-column">
                 <div className="order-summary">
                   <div>
-                    <div className="summary-meta">Your {proteinSummary.toLowerCase()}</div>
+                    <div className="summary-meta">Your {sandwichSize.toLowerCase()} {proteinSummary.toLowerCase()}</div>
                     <div className="summary-main">
                       <div className="qty-box" aria-label="Quantity selector">
                         <button type="button" className="operator" onClick={() => setQuantity((value) => Math.max(1, value - 1))} disabled={quantity === 1}>−</button>

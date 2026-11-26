@@ -24,3 +24,6 @@ Thumbs.db
 
 # Personal to-do lists
 TODO_*.md
+
+# Local helper script
+/run

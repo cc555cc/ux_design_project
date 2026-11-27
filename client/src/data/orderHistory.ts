@@ -15,6 +15,8 @@ export type SavedOrderItem = {
 export type SavedOrder = {
   id: string
   account_id?: string
+  fulfillment?: "delivery" | "pickup"
+  deliveryAddress?: string
   pickupName: string
   pickupTime: string
   items: SavedOrderItem[]

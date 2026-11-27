@@ -26,6 +26,8 @@ class ChatbotTestCase(unittest.TestCase):
             mock.patch.object(model_learning, "LEARNED_INTERACTIONS_FILE", temp_dir / "learned.jsonl"),
             mock.patch.object(model_learning, "LEARNING_LOG_FILE", temp_dir / "log.txt"),
             mock.patch.object(chatbot, "save_order", lambda *args: save_order(*args, file_path=self.order_file)),
+            #these tests cover the keyword rules, so never call the Claude API even when a key is set
+            mock.patch.dict(chatbot.os.environ, {"ANTHROPIC_API_KEY": ""}),
         ]
         for patch in patches:
             patch.start()

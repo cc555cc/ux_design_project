@@ -10,12 +10,15 @@ from learning_resource.response_database import (
 from db.order_store import save_order
 from models.order_session import (
     ACTIVE_STATUSES, LIST_FIELDS, NO_SELECTION, OPTIONAL_FIELDS,
-    get_session, next_missing_step, start_new_order,
+    get_session, new_order, next_missing_step, start_new_order,
 )
 from learning_resource.model_learning import appending_learning_entry, predict_intent_from_learned_entries
 from text_normalization import lemmatize_word, lemmatize_words
 import random
 import re
+import os
+import anthropic
+from message_interpreter import NOT_CHOSEN, interpret_message
 
 
 NAME_PREFIX_WORDS = {"the", "a", "an", "name", "is"}
@@ -55,6 +58,12 @@ def count_selected_ingredients(order):
 def generate_response(phrase, session_id=None):
     session_id, session = get_session(session_id)
     word_list = parse_phrase(phrase)
+
+    #Claude reads the message first, the keyword rules below are the fallback when it is not available
+    interpretation = interpret_with_claude(phrase, session)
+    if interpretation:
+        return respond_to_interpretation(interpretation, word_list, session)
+
     intents = get_intent(phrase)
 
     #an order is in progress: keep collecting order details, unless the user asks a side question
@@ -66,6 +75,196 @@ def generate_response(phrase, session_id=None):
         return continue_order(word_list, session)
 
     return get_response(phrase, intents, session=session)
+
+
+#----- Claude path: Claude interprets the message, the code below applies it and writes the reply -----
+
+SINGLE_FIELDS = ("bread", "size", "protein", "cheese")
+LIST_FIELD_ORDER = ("veggies", "sauce")
+TOPIC_ANSWERS = {
+    "hours": BUSINESS_INFO["operation"]["details"]["time"],
+    "address": BUSINESS_INFO["operation"]["details"]["address"],
+    "contact": BUSINESS_INFO["contact"]["response"],
+    "delivery": BUSINESS_INFO["service"]["details"]["delivery"],
+}
+
+
+#ask Claude what the message means, None when there is no API key or the call fails (the keyword rules answer then)
+def interpret_with_claude(phrase, session):
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+
+    #outside an order, Claude starts from an empty sandwich
+    order = session["order"] if session["status"] in ACTIVE_STATUSES else new_order()
+    try:
+        return interpret_message(phrase, session, order)
+    except (anthropic.APIConnectionError, anthropic.APIStatusError) as error:
+        print(f"Claude call failed, using keyword rules: {error}")
+        return None
+
+
+def answer_topic(topic):
+    if topic == "menu":
+        return build_menu_response()
+    return TOPIC_ANSWERS.get(topic, "")
+
+
+#turn Claude's interpretation into the chatbot reply
+def respond_to_interpretation(interpretation, word_list, session):
+    action = interpretation["action"]
+    topic = interpretation["topic"]
+    active = session["status"] in ACTIVE_STATUSES
+
+    if action == "order":
+        reply = apply_claude_order(interpretation, word_list, session)
+        #a delivery question asked together with an order is already answered by the pickup-only notice
+        if topic not in ("none", "delivery"):
+            return f"{answer_topic(topic)}\n{reply}"
+        return reply
+
+    if action == "cancel":
+        if active:
+            session["status"] = "idle"
+            session["pending"] = None
+            return "No problem, I've cancelled that order. Let me know whenever you want to start a new one."
+        return "There's no order in progress right now. Tell me what you'd like whenever you're ready."
+
+    if action == "confirm" and session["status"] == "confirming":
+        return place_order(session)
+
+    if action == "reject" and session["status"] == "confirming":
+        return "No problem, what would you like to change? You can say things like \"swap swiss for cheddar\" or \"no onions\"."
+
+    if action == "question" and topic != "none":
+        answer = answer_topic(topic)
+    elif action == "greeting":
+        answer = "Hi!" if active else random.choice(BUSINESS_INFO["greeting"]["responses"])
+    else:
+        answer = "Sorry, I didn't catch that." if active else "Sorry, I do not understand that yet."
+
+    #remind the customer where the order is at
+    if active:
+        return f"{answer}\n{prompt_for_step(session)}"
+    return answer
+
+
+#update the order with what Claude worked out, then reply the same way as the keyword path
+def apply_claude_order(interpretation, word_list, session):
+    started = session["status"] not in ACTIVE_STATUSES
+    if started:
+        start_new_order(session)
+
+    was_confirming = session["status"] == "confirming"
+    session["unclear_time"] = False
+    session["closed_time"] = False
+    changes = apply_claude_changes(interpretation, session)
+    session["pending"] = next_missing_step(session["order"])
+    notice = build_notice(word_list, session)
+
+    if was_confirming and not changes:
+        lead = notice or "Sorry, I didn't catch that."
+        return f"{lead} {build_order_review(session['order'])}"
+
+    return reply_after_changes(session, changes, notice, started)
+
+
+#copy the sandwich Claude returned into the order, keeping the ingredient limit and opening hours.
+#returns the list of changes for the acknowledgement message
+def apply_claude_changes(interpretation, session):
+    order = session["order"]
+    had_ingredients = any(order[category] is not None for category in SINGLE_FIELDS + LIST_FIELD_ORDER)
+    changes = []
+    session["left_out"] = []
+    session["unavailable"] = [
+        {"category": entry["category"], "name": entry["item"]} for entry in interpretation["not_on_menu"]
+    ]
+
+    #bread, size, meat and cheese hold one value each
+    added_singles = []
+    for category in SINGLE_FIELDS:
+        value = interpretation[category]
+        new_value = None if value == NOT_CHOSEN else NO_SELECTION if value == "none" else value
+        old_value = order[category]
+        if new_value == old_value:
+            continue
+
+        order[category] = new_value
+        label = CATEGORY_LABELS.get(category, category)
+        if new_value == NO_SELECTION:
+            changes.append(f"no {label}")
+        elif new_value is None:
+            changes.append(f"no {old_value}" if old_value != NO_SELECTION else f"{label} cleared")
+        else:
+            changes.append(new_value)
+            if old_value in (None, NO_SELECTION):
+                added_singles.append((category, old_value))
+
+    #veggies and sauce: remove first, so swapping items never runs into the ingredient limit
+    wanted_lists = {}
+    for category in LIST_FIELD_ORDER:
+        old_items = order[category]
+        if not interpretation[f"{category}_chosen"]:
+            if old_items is not None:
+                changes.extend(f"no {name}" for name in old_items)
+                order[category] = None
+            continue
+
+        wanted = list(dict.fromkeys(interpretation[category]))
+        wanted_lists[category] = wanted
+        order[category] = [name for name in (old_items or []) if name in wanted]
+        changes.extend(f"no {name}" for name in (old_items or []) if name not in wanted)
+        if old_items is None and not wanted:
+            changes.append(f"no {category}")
+
+    for category, wanted in wanted_lists.items():
+        for name in wanted:
+            if name in order[category]:
+                continue
+            if count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS:
+                order[category].append(name)
+                changes.append(name)
+            else:
+                session["left_out"].append(name)
+
+    #a meat or cheese added to a full sub does not fit either
+    while count_selected_ingredients(order) > MAX_ORDER_INGREDIENTS and added_singles:
+        category, old_value = added_singles.pop()
+        session["left_out"].append(order[category])
+        changes.remove(order[category])
+        order[category] = old_value
+
+    #"remove all": one short message instead of listing every removed ingredient
+    if had_ingredients and all(order[category] is None for category in SINGLE_FIELDS + LIST_FIELD_ORDER):
+        changes = ["removed everything from your sub"]
+
+    name = interpretation["name"].strip()
+    if name and name != order["name"] and len(name) <= 40:
+        order["name"] = name
+        changes.append(f"order under {name}")
+
+    pickup_time = normalize_pickup_time(interpretation["pickup_time"])
+    if pickup_time == "unclear":
+        session["unclear_time"] = session["pending"] == "pickup_time"
+    elif pickup_time and not is_open_at(pickup_time):
+        session["closed_time"] = True
+    elif pickup_time and pickup_time != order["pickup_time"]:
+        order["pickup_time"] = pickup_time
+        changes.append(f"pickup {format_pickup_time(pickup_time)}")
+
+    return changes
+
+
+#"12:30 PM" -> "12:30pm", "asap" -> "ASAP", anything that is not a real time -> "unclear"
+def normalize_pickup_time(value):
+    value = value.strip().lower().replace(" ", "").replace(".", "")
+    if value in ("", "unclear", "noon"):
+        return value
+    if value == "asap":
+        return "ASAP"
+    return value if pickup_minutes(value) is not None else "unclear"
+
+
+#----- keyword path -----
 
 def parse_phrase(phrase):
     parse_list = []
@@ -494,6 +693,11 @@ def continue_order(word_list, session, started=False):
             return "No problem, what would you like to change? You can say things like \"swap swiss for cheddar\" or \"no onions\"."
         return f"Sorry, I didn't catch that. {build_order_review(session['order'])}"
 
+    return reply_after_changes(session, changes, notice, started)
+
+
+#acknowledge the changes and ask for the next missing step, or show the review when everything is filled
+def reply_after_changes(session, changes, notice, started=False):
     if session["pending"] is None:
         session["status"] = "confirming"
         return f"{notice} {build_order_review(session['order'])}".strip()

@@ -5,11 +5,29 @@
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+
+def load_env_file(path):
+    """reads KEY=VALUE lines from server/.env (if it exists) into the environment, for running locally.
+    variables that are already set (e.g. in Railway) win. the file is gitignored: never commit it."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+#must run before the route modules are imported, since some of them read the environment
+load_env_file(Path(__file__).resolve().parent.parent / ".env")
 
 from routes.chat import handle_chat, handle_reset, handle_session
 from routes.menu import handle_menu
-from routes.orders import handle_list_orders
+from routes.orders import handle_confirmation_email, handle_list_orders
 
 
 HOST = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
@@ -22,6 +40,7 @@ ROUTES = {
     ("GET", "/api/session"): handle_session,
     ("GET", "/api/menu"): handle_menu,
     ("GET", "/api/orders"): handle_list_orders,
+    ("POST", "/api/orders/confirmation-email"): handle_confirmation_email,
 }
 
 

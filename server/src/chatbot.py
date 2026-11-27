@@ -9,7 +9,7 @@ from learning_resource.response_database import (
 )
 from db.order_store import save_order
 from models.order_session import (
-    ACTIVE_STATUSES, LIST_FIELDS, NO_SELECTION, OPTIONAL_FIELDS,
+    ACTIVE_STATUSES, EXTRA_FIELDS, LIST_FIELDS, NO_SELECTION, OPTIONAL_FIELDS,
     get_session, new_order, next_missing_step, start_new_order,
 )
 from learning_resource.model_learning import appending_learning_entry, predict_intent_from_learned_entries
@@ -41,11 +41,13 @@ FILLER_WORDS = {"the", "any", "a", "an", "some", "more", "extra", "my", "of"}
 MAX_ORDER_INGREDIENTS = 8
 #how each category is called when talking to the customer
 CATEGORY_LABELS = {"bread": "bread", "protein": "meat", "cheese": "cheese", "veggies": "veggies", "sauce": "sauce"}
+#price of a second meat / cheese on top of its menu price, the same as the order page's extra meat / extra cheese
+EXTRA_PRICES = {"protein": 1.50, "cheese": 0.75}
 
 
 def count_selected_ingredients(order):
     count = 0
-    for category in ("bread", "protein", "cheese"):
+    for category in ("bread", "protein", "cheese", *EXTRA_FIELDS.values()):
         value = order.get(category)
         if value and value != NO_SELECTION:
             count += 1
@@ -232,6 +234,24 @@ def apply_claude_changes(interpretation, session):
         session["left_out"].append(order[category])
         changes.remove(order[category])
         order[category] = old_value
+
+    #the second meat / cheese: only next to a chosen, different main one, and only if it still fits
+    for category, extra_field in EXTRA_FIELDS.items():
+        value = interpretation.get(extra_field, "none")
+        main = order[category]
+        new_extra = None if value in ("none", NOT_CHOSEN) or main in (None, NO_SELECTION) or value == main else value
+        old_extra = order.get(extra_field)
+        if new_extra == old_extra:
+            continue
+        order[extra_field] = new_extra
+        if new_extra and count_selected_ingredients(order) > MAX_ORDER_INGREDIENTS:
+            order[extra_field] = old_extra
+            session["left_out"].append(new_extra)
+        elif new_extra:
+            changes.append(f"extra {new_extra}")
+        elif old_extra != main:
+            #(when the extra was moved up to be the main meat, the main's change already says so)
+            changes.append(f"no {old_extra}")
 
     #"remove all": one short message instead of listing every removed ingredient
     if had_ingredients and all(order[category] is None for category in SINGLE_FIELDS + LIST_FIELD_ORDER):
@@ -593,13 +613,38 @@ def apply_order_details(word_list, session):
             if order[category] and name in order[category]:
                 order[category].remove(name)
                 changes.append(f"no {name}")
+        elif category in EXTRA_FIELDS and order.get(EXTRA_FIELDS[category]) == name:
+            order[EXTRA_FIELDS[category]] = None
+            changes.append(f"no {name}")
         elif order[category] == name:
-            #ask again for this step unless the user names a replacement in the same sentence
-            order[category] = None
+            extra_field = EXTRA_FIELDS.get(category)
+            if extra_field and order.get(extra_field):
+                #"no turkey" on turkey + beef keeps the beef as the only meat
+                order[category] = order[extra_field]
+                order[extra_field] = None
+            else:
+                #ask again for this step unless the user names a replacement in the same sentence
+                order[category] = None
             changes.append(f"no {name}")
 
+    #meat / cheese named in this message: a second, different one ("turkey and beef") becomes the extra
+    named_this_message = {}
     for match in additions:
         category, name = match["category"], match["name"]
+        extra_field = EXTRA_FIELDS.get(category)
+        if extra_field and category in named_this_message and named_this_message[category] != name:
+            if order.get(extra_field) != name:
+                if count_selected_ingredients(order) < MAX_ORDER_INGREDIENTS:
+                    order[extra_field] = name
+                    changes.append(f"extra {name}")
+                else:
+                    session["left_out"].append(name)
+            continue
+        if extra_field:
+            named_this_message[category] = name
+            #switching the main meat to the one that was the extra
+            if order.get(extra_field) == name:
+                order[extra_field] = None
         if category in LIST_FIELDS:
             if order[category] is None:
                 order[category] = []
@@ -630,6 +675,8 @@ def apply_order_details(word_list, session):
 
     for category in negated_categories & OPTIONAL_FIELDS:
         order[category] = [] if category in LIST_FIELDS else NO_SELECTION
+        if category in EXTRA_FIELDS:
+            order[EXTRA_FIELDS[category]] = None
         changes.append(f"no {category}")
 
     #a plain "no" / "none" / "skip" answers the step that was just asked
@@ -798,19 +845,32 @@ def calculate_total(order):
     for category, section_items in MENU_ITEMS.items():
         selected = order.get(category)
         selected = selected if isinstance(selected, list) else [selected]
+        #a second meat / cheese: its menu price plus the extra charge
+        extra = order.get(EXTRA_FIELDS.get(category, ""))
+        if extra:
+            selected = selected + [extra]
+            total += EXTRA_PRICES[category]
         for item in section_items:
-            if item["name"] in selected:
-                total += item["price"]
+            total += item["price"] * selected.count(item["name"])
 
     return round(total, 2)
+
+
+#"Turkey" or, with a second meat, "Turkey + Roast Beef (extra meat +$1.50)"
+def format_single_with_extra(order, category):
+    main = format_choice(order[category])
+    extra = order.get(EXTRA_FIELDS[category])
+    if not extra:
+        return main
+    return f"{main} + {extra} (extra {CATEGORY_LABELS[category]} +${EXTRA_PRICES[category]:.2f})"
 
 
 def build_order_review(order):
     return (
         "Here's your order:\n"
         f"- {format_choice(order['size'])} on {format_choice(order['bread'])}\n"
-        f"- Meat: {format_choice(order['protein'])}\n"
-        f"- Cheese: {format_choice(order['cheese'])}\n"
+        f"- Meat: {format_single_with_extra(order, 'protein')}\n"
+        f"- Cheese: {format_single_with_extra(order, 'cheese')}\n"
         f"- Veggies: {format_choice(order['veggies'])}\n"
         f"- Sauce: {format_choice(order['sauce'])}\n"
         f"- Pickup: {order['name']}, {format_pickup_time(order['pickup_time'])}\n"

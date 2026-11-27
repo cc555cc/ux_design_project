@@ -23,8 +23,15 @@ _lock = threading.Lock()
 SESSION_TTL_SECONDS = 30 * 60
 
 
+#an optional second meat / cheese ("turkey and beef"). never asked for, only set when the customer names two,
+#and charged like the order page's extra meat / extra cheese
+EXTRA_FIELDS = {"protein": "extra_protein", "cheese": "extra_cheese"}
+
+
 def new_order():
-    return {step: None for step in ORDER_STEPS}
+    order = {step: None for step in ORDER_STEPS}
+    order.update({extra_field: None for extra_field in EXTRA_FIELDS.values()})
+    return order
 
 
 def new_session():

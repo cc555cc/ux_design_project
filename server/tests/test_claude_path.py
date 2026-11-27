@@ -40,6 +40,8 @@ class ClaudePathTestCase(ChatbotTestCase):
                  "name": order["name"] or "", "pickup_time": order["pickup_time"] or ""}
         for category in chatbot.SINGLE_FIELDS:
             reply[category] = NOT_CHOSEN if order[category] is None else order[category]
+        for extra_field in chatbot.EXTRA_FIELDS.values():
+            reply[extra_field] = order.get(extra_field) or "none"
         for category in chatbot.LIST_FIELD_ORDER:
             reply[f"{category}_chosen"] = order[category] is not None
             reply[category] = list(order[category] or [])

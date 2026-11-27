@@ -46,6 +46,13 @@ Removed because they only applied to reservations or deliveries: `extract_party_
 - "no cucumber" while another step is pending no longer also answers "no" to that step.
 - `build_notice()` puts these messages in front of the next question or the review.
 
+### Second meat / cheese ("turkey and beef")
+**Before:** meat and cheese held one value. With Claude, "turkey and beef" got "Sorry, I didn't catch that"; with the keyword rules the second meat silently replaced the first while the reply said "Got it: Turkey, Roast Beef".
+**Now:** the order has `extra_protein` and `extra_cheese` (`EXTRA_FIELDS` in `models/order_session.py`). They are never asked for, only filled when the customer names two different ones in one message: "Got it: Turkey, extra Roast Beef".
+- Charged like the order page: the item's price plus `EXTRA_PRICES` (extra meat $1.50, extra cheese $0.75), and they count towards the 8-portion limit. The review shows "Turkey + Roast Beef (extra meat +$1.50)".
+- "no beef" removes the extra; "no turkey" moves the extra up to be the only meat; "change to chicken" replaces the main meat; "no meat" clears both.
+- Claude's schema has `extra_protein` / `extra_cheese` (a menu name or `none`); `apply_claude_changes()` ignores an extra that matches the main one or has no main one.
+
 ## Minor changes
 
 - `extract_name()`: also skips "is" ("my name is Carson"). Names are additionally checked against `NON_NAME_WORDS` (ingredients, keywords, stop words) so that "for pickup" or "for lunch" is not saved as a name. When the bot has just asked for the name, a plain reply ("Carson") is accepted.

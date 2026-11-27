@@ -75,25 +75,19 @@ function AboutParagraph(){
     return (
         <div className="space-y-4 text-2xl leading-relaxed text-gray-700 pt-[0vh]">
             <p>
-                At <Highlight>Long Story Sub</Highlight>, we think ordering a sandwich online should be as
-                <Highlight> enjoyable</Highlight> as eating one. Instead of clicking through endless menus,
-                you simply chat with our assistant and watch your sub come together one layer at a time:
-                the bread, the size, your favorite fillings and the perfect sauce. Every order is a little
-                story, and you're the one writing it.
-            </p>                  
+                At <Highlight>Long Story Sub</Highlight>, ordering a sandwich should be as
+                <Highlight> enjoyable</Highlight> as eating one. Just chat with our assistant and watch your
+                sub come together, one layer at a time.
+            </p>
             <p>
-                It's also built to be <Highlight>convenient</Highlight>. Order from your couch, your desk or
-                wherever you are, and we'll bring your sub <Highlight>straight to your door</Highlight>.
-                Change your mind as often as you like ("hold the onions", "swap the swiss for cheddar") and
-                your order updates instantly, with no starting over. Prefer to grab it yourself? Our shop is
-                open for pickup and walk-in orders too.
-            </p>            
+                It's <Highlight>convenient</Highlight>, too: order from wherever you are and we'll bring it
+                <Highlight> straight to your door</Highlight>. Change your mind ("hold the onions") and your
+                order updates instantly. Prefer to grab it yourself? Pickup and walk-ins are welcome.
+            </p>
             <p>
-                Most of all, we want ordering to be <Highlight>accessible</Highlight> to everyone. There's
-                no special wording to learn and no complicated steps to follow. Just type the way you'd talk
-                to someone behind the counter, and we'll take care of the rest. A great sandwich should be
-                easy for anyone to get.
-            </p>        
+                Most of all, it's <Highlight>accessible</Highlight>. No special wording, no complicated
+                steps. Just say it the way you'd tell someone behind the counter.
+            </p>
         </div>
     )
 }
@@ -120,29 +114,96 @@ function StoreContactInfo(){
     )
 }
 
+//straight-line distance in km between two map points (haversine formula)//
+function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}
+
 function ShopList({selectedStore, onSelect}: {selectedStore: string | null; onSelect: (name:string) => void}) {
+  //km from the user to each shop, once they've shared their location//
+  const [distances, setDistances] = useState<Record<string, number> | null>(null)
+  const [locating, setLocating] = useState(false)
+  const [locateError, setLocateError] = useState<string | null>(null)
+  const nearest = distances
+    ? SHOPS.reduce((best, shop) => (distances[shop.name] < distances[best.name] ? shop : best)).name
+    : null
+
+  //asks the browser for the user's location, then picks the closest shop (the map moves to it)//
+  const findNearest = () => {
+    if (!("geolocation" in navigator)) {
+      setLocateError("Your browser can't share your location. Pick a shop from the list instead.")
+      return
+    }
+    setLocating(true)
+    setLocateError(null)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const here = { lat: coords.latitude, lng: coords.longitude }
+        const found = Object.fromEntries(SHOPS.map((shop) => [shop.name, distanceKm(here, shop.position)]))
+        setDistances(found)
+        setLocating(false)
+        onSelect(SHOPS.reduce((best, shop) => (found[shop.name] < found[best.name] ? shop : best)).name)
+      },
+      (error) => {
+        setLocating(false)
+        setLocateError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location access was blocked. Allow it in your browser, or pick a shop from the list."
+            : "We couldn't find your location. Please try again or pick a shop from the list."
+        )
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60 * 1000 }
+    )
+  }
 
   return (
-    <ul className="flex flex-col gap-3 overflow-y-auto">
-      {SHOPS.map(shop => (
-        <li key={shop.name}>
-          <button
-            type="button"
-            onClick={() => onSelect(shop.name)}
-            aria-pressed={selectedStore === shop.name}
-            className={`flex w-full items-center gap-3 border-b-3 p-4 text-left transition-colors hover:bg-gray-100 ${
-              selectedStore === shop.name ? "border-[#D62828]" : "border-transparent"
-            }`}
-          >
-            <img src={shopPic} alt="" className="h-8 w-8 shrink-0" />
-            <div>
-              <h3 className="font-gasoek text-lg text-gray-900">{shop.name}</h3>
-              <p className="text-sm text-gray-700">Pickup &amp; walk-in orders welcome</p>
-            </div>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="flex min-h-0 flex-col gap-3">
+      <button
+        type="button"
+        onClick={findNearest}
+        disabled={locating}
+        className="flex items-center justify-center gap-2 self-start rounded-full bg-[#D62828] px-5 py-2.5 font-semibold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-70"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
+          <circle cx="12" cy="9.5" r="2.5" />
+        </svg>
+        {locating ? "Finding you…" : "Find the nearest pickup"}
+      </button>
+      {locateError ? <p role="alert" className="text-sm text-red-700">{locateError}</p> : null}
+
+      <ul className="flex flex-col gap-3 overflow-y-auto">
+        {SHOPS.map(shop => (
+          <li key={shop.name}>
+            <button
+              type="button"
+              onClick={() => onSelect(shop.name)}
+              aria-pressed={selectedStore === shop.name}
+              className={`flex w-full items-center gap-3 border-b-3 p-4 text-left transition-colors hover:bg-gray-100 ${
+                selectedStore === shop.name ? "border-[#D62828]" : "border-transparent"
+              }`}
+            >
+              <img src={shopPic} alt="" className="h-8 w-8 shrink-0" />
+              <div>
+                <h3 className="font-gasoek text-lg text-gray-900">{shop.name}</h3>
+                <p className="text-sm text-gray-700">Pickup &amp; walk-in orders welcome</p>
+              </div>
+              {distances ? (
+                <span className={`ml-auto shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                  shop.name === nearest ? "bg-[#D62828] text-white" : "bg-gray-100 text-gray-700"
+                }`}>
+                  {shop.name === nearest ? "Nearest · " : ""}{distances[shop.name].toFixed(1)} km
+                </span>
+              ) : null}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

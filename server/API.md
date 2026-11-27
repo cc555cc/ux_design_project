@@ -9,6 +9,7 @@ Base URL: `http://127.0.0.1:8010` (default). Every response is JSON. CORS is ope
 | GET | `/api/session?session_id=…` | Read the current order state without sending a message |
 | GET | `/api/menu` | Ingredient catalog grouped by build step |
 | GET | `/api/orders` | Confirmed orders, newest first |
+| POST | `/api/orders/confirmation-email` | Email the customer a confirmation after checkout on the order page |
 
 ## Session state
 
@@ -140,6 +141,35 @@ Response `200`:
   ]
 }
 ```
+
+## POST `/api/orders/confirmation-email`
+
+Sent by the order page after checkout. Request:
+
+```json
+{
+  "email": "customer@example.com",
+  "name": "Sam",
+  "fulfillment": "delivery",
+  "address": "12 King St",
+  "time": "12:30 PM",
+  "order_id": "order-1764219300000",
+  "total": 8.24,
+  "items": [{ "quantity": 1, "size": "6-inch", "summary": "Italian Herbs, Chicken (Normal)", "total": 8.24 }]
+}
+```
+
+`address` is required only for `"delivery"`. Responses: `200 { "sent": true }`, `400` for invalid input, `429` when one address (3 per 10 minutes) or the server (60 per hour) has been sent too many, `503` when email isn't set up, `502` when the mail server refuses.
+
+Sending uses SMTP, configured with environment variables (set them in Railway, or in your shell when running locally; never commit them):
+
+| Variable | Example |
+|---|---|
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` (STARTTLS, default) or `465` (SSL) |
+| `SMTP_USER` | `longstorysub@gmail.com` |
+| `SMTP_PASSWORD` | a Gmail **app password** (Google account → Security → 2-Step Verification → App passwords) |
+| `MAIL_FROM` | optional, defaults to `SMTP_USER` |
 
 ## Errors
 

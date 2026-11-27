@@ -27,6 +27,8 @@ RESPONSE_SCHEMA = {
         "size": {"type": "string", "enum": menu_names("size") + [NOT_CHOSEN]},
         "protein": {"type": "string", "enum": menu_names("protein") + ["none", NOT_CHOSEN]},
         "cheese": {"type": "string", "enum": menu_names("cheese") + ["none", NOT_CHOSEN]},
+        "extra_protein": {"type": "string", "enum": menu_names("protein") + ["none"]},
+        "extra_cheese": {"type": "string", "enum": menu_names("cheese") + ["none"]},
         "veggies_chosen": {"type": "boolean"},
         "veggies": {"type": "array", "items": {"type": "string", "enum": menu_names("veggies")}},
         "sauce_chosen": {"type": "boolean"},
@@ -47,7 +49,7 @@ RESPONSE_SCHEMA = {
         },
     },
     "required": [
-        "action", "topic", "bread", "size", "protein", "cheese", "veggies_chosen", "veggies",
+        "action", "topic", "bread", "size", "protein", "cheese", "extra_protein", "extra_cheese", "veggies_chosen", "veggies",
         "sauce_chosen", "sauce", "name", "pickup_time", "not_on_menu",
     ],
     "additionalProperties": False,
@@ -56,7 +58,8 @@ RESPONSE_SCHEMA = {
 MENU_TEXT = "\n".join(f"- {category}: {', '.join(menu_names(category))}" for category in MENU_ITEMS)
 
 SYSTEM_PROMPT = f"""You read messages sent to the ordering chat of Long Story Sub, a sandwich shop. A sub has one bread, one size,
-one meat (protein), one cheese, any number of veggies and sauces, plus the customer's name and a pickup time.
+a meat (protein) plus optionally a second, different meat (extra meat), a cheese plus optionally a second, different
+cheese (extra cheese), any number of veggies and sauces, plus the customer's name and a pickup time.
 
 Menu:
 {MENU_TEXT}
@@ -79,11 +82,16 @@ prices, delivery), also when the same message changes the order. Otherwise none.
 The order fields: the WHOLE order as it should be after this message. Copy every field the message does not change.
 - bread, size: a menu name, or not_chosen
 - protein, cheese: a menu name, none when the customer does not want any, or not_chosen
+- extra_protein, extra_cheese: the second meat / cheese when the customer wants two different ones
+  ("turkey and beef" means protein Turkey and extra_protein Roast Beef), otherwise none. Never the same as
+  protein / cheese. "Change to chicken" replaces protein and keeps extra_protein; "no beef" removes whichever
+  field holds Roast Beef (when protein is removed and an extra is set, move the extra into protein)
 - veggies, sauce: the full list after the message. veggies_chosen / sauce_chosen is true once the customer has
   answered, including "no veggies" (true with an empty list); false when not answered yet
 - "all veggies" or "everything" for veggies means every veggie on the menu
 - "remove all" / "remove everything" / "clear it" without naming a category empties the sandwich: bread, size,
-  protein and cheese not_chosen, veggies_chosen and sauce_chosen false, empty lists. Keep the name and pickup time.
+  protein and cheese not_chosen, extras none, veggies_chosen and sauce_chosen false, empty lists. Keep the name and
+  pickup time.
 - "remove all veggies" means veggies_chosen true with an empty list; the same for the other categories
 - "swap swiss for cheddar" means cheese Cheddar
 - name: the name for the order, "" if not given

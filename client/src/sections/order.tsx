@@ -50,6 +50,12 @@ import staffHelper from "../assets/sandwich-shop-employee-male_transparent.png"
 const productOptions = ["Bread", "Protein", "Cheese", "Veggies", "Sauce"] as const
 type ProductOption = (typeof productOptions)[number]
 type OrderMode = "menu" | "voice"
+/** delivery is the main way the shop sells; pickup is for customers who come to the shop */
+type Fulfillment = "delivery" | "pickup"
+const fulfillmentOptions: { id: Fulfillment; label: string }[] = [
+  { id: "delivery", label: "Delivery" },
+  { id: "pickup", label: "Pickup" },
+]
 
 type ToppingOption = {
   name: string
@@ -371,6 +377,8 @@ function OrderSection() {
   const [cartOpen, setCartOpen] = useState(false)
   const [pickupName, setPickupName] = useState("")
   const [pickupTime, setPickupTime] = useState("")
+  const [fulfillment, setFulfillment] = useState<Fulfillment>("delivery")
+  const [deliveryAddress, setDeliveryAddress] = useState("")
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     // keeps the pickup times current while the page stays open
@@ -541,7 +549,11 @@ function OrderSection() {
       setUndoSnapshot(null)
       if (response.order.size) setSandwichSize(response.order.size)
       if (response.order.name) setPickupName(response.order.name)
-      if (response.order.pickup_time) setPickupTime(toPickupValue(response.order.pickup_time))
+      if (response.order.pickup_time) {
+        // the chat assistant only takes pickup orders, so a time agreed in chat is a pickup time
+        setPickupTime(toPickupValue(response.order.pickup_time))
+        setFulfillment("pickup")
+      }
 
       if (response.status === "complete" && response.order_id) {
         const summary = mappedSelections.length > 0 ? mappedSelections.join(", ") : "Custom sub"
@@ -549,6 +561,7 @@ function OrderSection() {
         saveCompletedOrder({
           id: response.order_id,
           ...(user ? { account_id: user.id } : {}),
+          fulfillment: "pickup",
           pickupName: response.order.name ?? pickupName,
           pickupTime: response.order.pickup_time ?? pickupTime,
           total,
@@ -782,20 +795,30 @@ function OrderSection() {
 
   function completeCheckout() {
     if (cartItems.length === 0) return
+    const isDelivery = fulfillment === "delivery"
     if (!pickupName.trim()) {
-      setCheckoutMessage("Add a pickup name before confirming.")
+      setCheckoutMessage("Add a name for the order before confirming.")
+      return
+    }
+    if (isDelivery && !deliveryAddress.trim()) {
+      setCheckoutMessage("Add a delivery address before confirming.")
       return
     }
     if (!getPickupChoices(new Date()).isAllowed(pickupTime)) {
       setNow(new Date())
-      setCheckoutMessage("Choose a pickup time between 9 AM and 9 PM, at least 15 minutes from now.")
+      setCheckoutMessage(
+        `Choose a ${isDelivery ? "delivery" : "pickup"} time between 9 AM and 9 PM, at least 15 minutes from now.`
+      )
       return
     }
 
     const trimmedName = pickupName.trim()
+    const trimmedAddress = deliveryAddress.trim()
     saveCompletedOrder({
       id: `order-${Date.now()}`,
       ...(user ? { account_id: user.id } : {}),
+      fulfillment,
+      ...(isDelivery ? { deliveryAddress: trimmedAddress } : {}),
       pickupName: trimmedName,
       pickupTime,
       items: cartItems.map((item) => ({
@@ -808,7 +831,9 @@ function OrderSection() {
       source: "manual",
     })
 
-    const confirmation = `Order confirmed for ${trimmedName}. Pickup: ${pickupTime}.`
+    const confirmation = isDelivery
+      ? `Order confirmed for ${trimmedName}. Delivery to ${trimmedAddress}: ${pickupTime}.`
+      : `Order confirmed for ${trimmedName}. Pickup: ${pickupTime}.`
     setCartItems([])
     setAddedCount(0)
     setCartOpen(false)
@@ -847,6 +872,8 @@ function OrderSection() {
             chatSessionId?: string | null
             pickupName?: string
             pickupTime?: string
+            fulfillment?: Fulfillment
+            deliveryAddress?: string
           }
           setToppingAmounts({ ...emptyToppingAmounts, ...(draft.toppingAmounts ?? {}) })
           setSandwichSize(draft.sandwichSize ?? "6-inch")
@@ -855,6 +882,8 @@ function OrderSection() {
           setChatSessionId(draft.chatSessionId ?? null)
           setPickupName(draft.pickupName ?? "")
           setPickupTime(toPickupValue(draft.pickupTime ?? ""))
+          setFulfillment(draft.fulfillment === "pickup" ? "pickup" : "delivery")
+          setDeliveryAddress(draft.deliveryAddress ?? "")
 
           if (draft.chatSessionId) {
             try {
@@ -898,9 +927,11 @@ function OrderSection() {
       chatSessionId,
       pickupName,
       pickupTime,
+      fulfillment,
+      deliveryAddress,
     }
     localStorage.setItem(draftStorageKey, JSON.stringify(draft))
-  }, [isHydrated, user, toppingAmounts, sandwichSize, quantity, chatMessages, chatSessionId, pickupName, pickupTime])
+  }, [isHydrated, user, toppingAmounts, sandwichSize, quantity, chatMessages, chatSessionId, pickupName, pickupTime, fulfillment, deliveryAddress])
 
   useEffect(() => {
     if (!isHydrated) return
@@ -1092,8 +1123,9 @@ function OrderSection() {
 
         /* Chat popup panel that swaps in place of the ingredient menu on the right */
         .chat-popup { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 14px 30px rgba(31, 35, 33, 0.11); overflow: hidden; }
-        .chat-popup-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(175px, 40%, 240px); grid-template-rows: minmax(0, 1fr); }
-        .chat-conversation { min-width: 0; min-height: 0; padding: 12px 6px 10px 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+        /* staff on the left, conversation on the right, like a messaging app (the other person left, you right) */
+        .chat-popup-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: clamp(175px, 40%, 240px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+        .chat-conversation { min-width: 0; min-height: 0; padding: 12px 14px 10px 6px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
         .chat-kicker { flex: none; margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
         .chat-staff { position: relative; min-height: 220px; background: radial-gradient(ellipse 85% 55% at 50% 100%, rgba(214, 42, 42, 0.12), transparent 72%); }
         .chat-staff img { position: absolute; inset: 0; width: 100%; height: 100%; padding-top: 8px; object-fit: contain; object-position: center bottom; transform-origin: 50% 100%; filter: drop-shadow(0 6px 10px rgba(31, 35, 33, 0.18)); pointer-events: none; }
@@ -1103,10 +1135,11 @@ function OrderSection() {
         .chat-staff.error .avatar-status { color: var(--danger); box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.25); }
 
         .chat-log { flex: 1 1 0; min-height: 90px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; background: transparent; display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 6px; }
-        .speech { flex: none; align-self: flex-end; margin-right: 0; position: relative; background: var(--field); border: 2px solid var(--text); border-radius: 18px 18px 0 18px; padding: 10px 14px 8px; max-width: 100%; overflow-wrap: anywhere; box-shadow: 0 6px 14px var(--shadow); }
+        /* the staff's bubble: light, on the left beside the staff member, square bottom-left corner pointing at them */
+        .speech { flex: none; align-self: flex-start; margin: 0; position: relative; background: var(--field); border: 2px solid var(--text); border-radius: 18px 18px 18px 0; padding: 10px 14px 8px; max-width: 100%; overflow-wrap: anywhere; box-shadow: 0 6px 14px var(--shadow); }
         .speech p { margin: 0; font-size: 0.86rem; line-height: 1.4; color: var(--text); }
-        /* the customer's bubble: dark, on the left, square bottom-left corner */
-        .speech.from-user { align-self: flex-start; margin: 0; background: var(--text); border-color: var(--text); border-radius: 18px 18px 18px 0; }
+        /* the customer's bubble: dark, on the right, square bottom-right corner */
+        .speech.from-user { align-self: flex-end; margin: 0; background: var(--text); border-color: var(--text); border-radius: 18px 18px 0 18px; }
         .speech.from-user p { color: var(--bg); }
         .speech .tiny { font-size: 0.68rem; opacity: 0.85; margin-top: 6px; color: var(--text-muted); }
         .chat-footer { flex: none; padding: 10px 14px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
@@ -1151,7 +1184,12 @@ function OrderSection() {
         .cart-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px; border-radius: 10px; background: var(--field); font-size: 0.7rem; }
         .cart-item p { margin: 2px 0 0; color: var(--text-muted); }
         .cart-remove { border: 0; background: transparent; color: var(--danger); font-size: 0.68rem; cursor: pointer; }
+        .fulfillment-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 10px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
+        .fulfillment-button { border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); padding: 7px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+        .fulfillment-button:hover:not(.active) { color: var(--text); background: var(--surface-hover); }
+        .fulfillment-button.active { background: var(--text); color: var(--bg); }
         .checkout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .checkout-wide { grid-column: 1 / -1; }
         .checkout-input { border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 10px; background: var(--field); color: var(--text); font-size: 0.72rem; }
         .cart-total-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.76rem; font-weight: 700; }
         .checkout-button { border: 0; border-radius: 999px; background: var(--accent); color: #fff; padding: 8px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; }
@@ -1177,7 +1215,7 @@ function OrderSection() {
           .builder-tabs { justify-content: center; }
           .topping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .summary-main { flex-direction: column; align-items: flex-start; }
-          .chat-popup-body { grid-template-columns: minmax(0, 1fr) 130px; }
+          .chat-popup-body { grid-template-columns: 130px minmax(0, 1fr); }
           .voice-controls { flex-wrap: wrap; }
           .checkout-grid { grid-template-columns: 1fr; }
         }
@@ -1416,6 +1454,18 @@ function OrderSection() {
                   >
                       <div className="chat-popup" aria-label="Order voice and chat assistant">
                         <div className="chat-popup-body">
+                          <div
+                            className={`chat-staff${chatLoading || isListening || isSpeaking ? " processing" : chatError ? " error" : ""}`}
+                          >
+                            <img src={staffHelper} alt="Long Story Sub staff member helping with your order" />
+                            <span className="avatar-status" role="status">
+                              {isListening || chatLoading || isSpeaking ? (
+                                <span className="mode-live-dot" aria-hidden="true" />
+                              ) : null}
+                              {assistantStatus}
+                            </span>
+                          </div>
+
                           <div className="chat-conversation">
                             <p className="chat-kicker">A little help from the counter.</p>
                             <div className="chat-log" ref={chatLogRef} role="log" aria-live="polite">
@@ -1436,18 +1486,6 @@ function OrderSection() {
                                 )
                               )}
                             </div>
-                          </div>
-
-                          <div
-                            className={`chat-staff${chatLoading || isListening || isSpeaking ? " processing" : chatError ? " error" : ""}`}
-                          >
-                            <img src={staffHelper} alt="Long Story Sub staff member helping with your order" />
-                            <span className="avatar-status" role="status">
-                              {isListening || chatLoading || isSpeaking ? (
-                                <span className="mode-live-dot" aria-hidden="true" />
-                              ) : null}
-                              {assistantStatus}
-                            </span>
                           </div>
                         </div>
 
@@ -1602,21 +1640,37 @@ function OrderSection() {
                             </li>
                           ))}
                         </ul>
+                        <div className="fulfillment-picker" role="group" aria-label="Delivery or pickup">
+                          {fulfillmentOptions.map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className={`fulfillment-button${fulfillment === option.id ? " active" : ""}`}
+                              onClick={() => {
+                                setFulfillment(option.id)
+                                setCheckoutMessage(null)
+                              }}
+                              aria-pressed={fulfillment === option.id}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
                         <div className="checkout-grid">
                           <input
                             className="checkout-input"
-                            aria-label="Pickup name"
+                            aria-label="Name for the order"
                             value={pickupName}
                             onChange={(event) => setPickupName(event.target.value)}
-                            placeholder="Pickup name"
+                            placeholder="Name"
                           />
                           <select
                             className="checkout-input"
-                            aria-label="Pickup time"
+                            aria-label={fulfillment === "delivery" ? "Delivery time" : "Pickup time"}
                             value={selectedPickup}
                             onChange={(event) => setPickupTime(event.target.value)}
                           >
-                            <option value="" disabled>Pickup time</option>
+                            <option value="" disabled>{fulfillment === "delivery" ? "Delivery time" : "Pickup time"}</option>
                             {selectedPickup && !pickupChoices.slots.includes(selectedPickup) ? (
                               <option value={selectedPickup}>{selectedPickup}</option>
                             ) : null}
@@ -1624,11 +1678,21 @@ function OrderSection() {
                               <option key={slot} value={slot}>{slot}</option>
                             ))}
                           </select>
+                          {fulfillment === "delivery" ? (
+                            <input
+                              className="checkout-input checkout-wide"
+                              aria-label="Delivery address"
+                              autoComplete="street-address"
+                              value={deliveryAddress}
+                              onChange={(event) => setDeliveryAddress(event.target.value)}
+                              placeholder="Delivery address (within 5 km of the shop)"
+                            />
+                          ) : null}
                         </div>
                         <div className="cart-total-row">
                           <span>Total ${cartTotal.toFixed(2)}</span>
                           <button type="button" className="checkout-button" onClick={completeCheckout}>
-                            Confirm pickup
+                            {fulfillment === "delivery" ? "Confirm delivery" : "Confirm pickup"}
                           </button>
                         </div>
                       </>

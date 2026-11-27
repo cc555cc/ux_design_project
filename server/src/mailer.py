@@ -1,46 +1,26 @@
-#sends the order confirmation email after checkout on the order page, configured with environment variables
-#(never put keys or passwords in the code). two ways to send, the first one that is set up is used:
-#
-#1. Brevo's web API (HTTPS). use this on hosts that block email ports, e.g. Railway's free/Hobby plans:
-#   BREVO_API_KEY  from brevo.com -> SMTP & API -> API keys
-#   MAIL_FROM      the sender address, verified in Brevo (Senders, domains & IPs -> Senders)
-#2. SMTP, e.g. Gmail (works when running locally):
+#sends the order confirmation email after checkout and the password reset code email over SMTP, configured with environment
+#variables (never put keys or passwords in the code):
 #   SMTP_HOST      e.g. smtp.gmail.com
 #   SMTP_PORT      587 for STARTTLS (default) or 465 for SSL
 #   SMTP_USER      the account that logs in, e.g. longstorysub@gmail.com
 #   SMTP_PASSWORD  for Gmail this is an "app password", not the normal password
 #   MAIL_FROM      optional sender address, defaults to SMTP_USER
-import json
 import os
 import smtplib
 import ssl
-import urllib.request
 from email.message import EmailMessage
 from html import escape
 
 SHOP_NAME = "Long Story Sub"
-BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 class MailNotConfigured(Exception):
     pass
 
 
-def brevo_settings():
-    """the Brevo key and sender, or None when Brevo isn't set up"""
-    key = os.environ.get("BREVO_API_KEY")
-    if not key:
-        return None
-    sender = os.environ.get("MAIL_FROM")
-    if not sender:
-        raise MailNotConfigured("Email is not set up on the server: MAIL_FROM is missing.")
-    return {"key": key.strip(), "sender": sender.strip()}
-
-
 def check_configured():
-    """raises MailNotConfigured unless Brevo or SMTP is set up"""
-    if brevo_settings() is None:
-        smtp_settings()
+    """raises MailNotConfigured unless SMTP is set up"""
+    smtp_settings()
 
 
 def smtp_settings():
@@ -110,38 +90,36 @@ def build_confirmation(order):
     return subject, text, html
 
 
-def send_with_brevo(settings, order, subject, text, html):
-    payload = {
-        "sender": {"name": SHOP_NAME, "email": settings["sender"]},
-        "to": [{"email": order["email"], "name": order["name"]}],
-        "subject": subject,
-        "textContent": text,
-        "htmlContent": html,
-    }
-    request = urllib.request.Request(
-        BREVO_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"api-key": settings["key"], "Content-Type": "application/json", "Accept": "application/json"},
-        method="POST",
-    )
-    #an HTTP error status raises urllib.error.HTTPError, which the route reports as "could not be sent"
-    with urllib.request.urlopen(request, timeout=15) as response:
-        response.read()
+def build_reset_code(code, minutes):
+    """the password reset email -> (subject, plain text body, html body)"""
+    subject = f"{SHOP_NAME}: your password reset code"
+    text = "\n".join([
+        "Someone asked to reset the password for your account.",
+        "",
+        f"Your code is: {code}",
+        "",
+        f"It expires in {minutes} minutes. If this wasn't you, you can ignore this email.",
+        "",
+        SHOP_NAME,
+    ])
+    html = f"""\
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:auto;color:#1f2321">
+  <h2 style="color:#d62a2a;margin-bottom:4px">Reset your password</h2>
+  <p>Someone asked to reset the password for your account. Your code is:</p>
+  <p style="font-size:32px;letter-spacing:8px;font-weight:bold;margin:16px 0">{escape(code)}</p>
+  <p style="color:#6b6b6b;font-size:13px">It expires in {minutes} minutes. If this wasn't you, you can ignore this email.</p>
+  <p>{SHOP_NAME}</p>
+</div>"""
+    return subject, text, html
 
 
-def send_confirmation(order):
-    subject, text, html = build_confirmation(order)
-    brevo = brevo_settings()
-    if brevo:
-        send_with_brevo(brevo, order, subject, text, html)
-        return
-
+def send_email(to, subject, text, html):
     settings = smtp_settings()
 
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = f"{SHOP_NAME} <{settings['sender']}>"
-    message["To"] = order["email"]
+    message["To"] = to
     message.set_content(text)
     message.add_alternative(html, subtype="html")
 
@@ -155,3 +133,13 @@ def send_confirmation(order):
             smtp.starttls(context=context)
             smtp.login(settings["user"], settings["password"])
             smtp.send_message(message)
+
+
+def send_confirmation(order):
+    subject, text, html = build_confirmation(order)
+    send_email(order["email"], subject, text, html)
+
+
+def send_reset_code(email, code, minutes):
+    subject, text, html = build_reset_code(code, minutes)
+    send_email(email, subject, text, html)

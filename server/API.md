@@ -161,16 +161,9 @@ Sent by the order page after checkout. Request:
 
 `address` is required only for `"delivery"`. Responses: `200 { "sent": true }`, `400` for invalid input, `429` when one address (3 per 10 minutes) or the server (60 per hour) has been sent too many, `503` when email isn't set up, `502` when the mail server refuses.
 
-Sending is configured with environment variables (Railway → Variables when deployed, `server/.env` locally; never commit them). If `BREVO_API_KEY` is set the server uses Brevo's web API, otherwise SMTP.
+Sending uses SMTP, configured with environment variables (Railway → Variables when deployed, `server/.env` locally; never commit them).
 
-**Deployed on Railway: use Brevo.** Railway's free/Hobby plans block outgoing SMTP connections, so SMTP times out there (`502` after ~15 s). Brevo sends over HTTPS, which is allowed.
-
-| Variable | Example |
-|---|---|
-| `BREVO_API_KEY` | brevo.com → SMTP & API → API keys → generate a key |
-| `MAIL_FROM` | the sender address, verified in Brevo → Senders (required with Brevo) |
-
-**Locally (or on a host that allows SMTP): Gmail SMTP.**
+**Note:** Railway's free/Hobby plans block outgoing SMTP connections, so sending times out there (`502` after ~15 s). It works locally or on a plan/host that allows SMTP.
 
 | Variable | Example |
 |---|---|
@@ -179,6 +172,24 @@ Sending is configured with environment variables (Railway → Variables when dep
 | `SMTP_USER` | `longstorysub@gmail.com` |
 | `SMTP_PASSWORD` | a Gmail **app password** (Google account → Security → 2-Step Verification → App passwords) |
 | `MAIL_FROM` | optional, defaults to `SMTP_USER` |
+
+## POST `/api/auth/reset-code`
+
+Emails a 6-digit password reset code, using the same SMTP settings as the confirmation email. Accounts live in the browser, so the server never sees passwords: it only issues and checks codes.
+
+```json
+{ "email": "sam@example.com" }
+```
+
+Responses: `200 { "sent": true, "expires_in_minutes": 10 }`, `400` for an invalid email, `429` when one address (3 per 15 minutes) or the server (60 per hour) has been sent too many, `503` when email isn't set up, `502` when the mail server refuses. A new code replaces the previous one. Codes are kept in memory, so a restart clears them.
+
+## POST `/api/auth/verify-reset`
+
+```json
+{ "email": "sam@example.com", "code": "123456" }
+```
+
+`200 { "verified": true }` when the code is right. The code then can't be used again, and the browser saves the new password. Otherwise `400` with a reason: wrong code, expired (after 10 minutes) or too many wrong tries (5).
 
 ## Errors
 

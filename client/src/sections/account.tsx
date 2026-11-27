@@ -53,8 +53,9 @@ function AccountSection() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="font-gasoek text-3xl text-[#D62828]">Account</h1>
-              <p className="mt-2 text-lg font-medium text-gray-900">@{user.username}</p>
-              <p className="text-xs text-gray-500">Account ID: {user.id}</p>
+              <p className="mt-2 text-xl font-medium text-gray-900">@{user.username}</p>
+              {user.email ? <p className="text-base text-gray-600">{user.email}</p> : null}
+              <p className="text-sm text-gray-500">Account ID: {user.id}</p>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -72,7 +73,7 @@ function AccountSection() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="cursor-pointer rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 transition hover:border-[#D62828] hover:text-[#D62828]"
+                className="cursor-pointer rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-base font-semibold text-gray-800 transition hover:border-[#D62828] hover:text-[#D62828]"
               >
                 Log Out
               </button>
@@ -84,15 +85,15 @@ function AccountSection() {
           <h2 className="font-gasoek text-2xl text-gray-900">Previous Orders</h2>
 
           {loadingOrders ? (
-            <p className="mt-4 text-sm text-gray-500">Loading your previous orders...</p>
+            <p className="mt-4 text-base text-gray-500">Loading your previous orders...</p>
           ) : orders.length === 0 ? (
             <div className="mt-4 rounded-xl bg-gray-50 p-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-base text-gray-600">
                 You haven&apos;t placed an order on this account yet.
               </p>
               <a
                 href="#order"
-                className="mt-4 inline-block rounded-xl bg-[#D62828] px-5 py-2.5 font-gasoek text-sm text-white transition hover:bg-red-700"
+                className="mt-4 inline-block rounded-xl bg-[#D62828] px-5 py-2.5 font-gasoek text-base text-white transition hover:bg-red-700"
               >
                 Start Your First Order
               </a>
@@ -110,7 +111,7 @@ function AccountSection() {
                         {item.quantity}x {item.size} — {item.summary}
                       </p>
                     ))}
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm text-gray-500">
                       Pickup: {order.pickupName || "—"}
                       {order.pickupTime ? ` at ${order.pickupTime}` : ""} · $
                       {order.total.toFixed(2)}
@@ -119,7 +120,7 @@ function AccountSection() {
                   <button
                     type="button"
                     onClick={() => handleOrderPrevious(order)}
-                    className="cursor-pointer rounded-xl bg-[#D62828] px-4 py-2 font-gasoek text-sm text-white transition hover:bg-red-700"
+                    className="cursor-pointer rounded-xl bg-[#D62828] px-4 py-2 font-gasoek text-base text-white transition hover:bg-red-700"
                   >
                     Order Previous
                   </button>

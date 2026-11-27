@@ -1685,7 +1685,7 @@ function OrderSection() {
         .page-loader { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 0 16px; background-color: var(--bg); transition: opacity 0.4s ease, visibility 0s linear 0.4s; }
         .page-loader.done { opacity: 0; visibility: hidden; pointer-events: none; }
         .loader-title { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.9rem); font-weight: 700; letter-spacing: -0.04em; color: var(--text); }
-        .loader-percent { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .loader-percent { margin: 0; font-size: 0.96rem; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; }
         /* both subs sit in the same grid cell, bottoms aligned, so the coloured one lines up exactly over the grey one */
         .loader-bar { display: grid; width: min(620px, 86vw); }
         .loader-bar > .sandwich-side-stack { grid-area: 1 / 1; align-self: end; }
@@ -1700,9 +1700,9 @@ function OrderSection() {
         .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.28fr 1fr; gap: 18px; }
         /* container-type lets .image-stage size itself from this column's width (cqw units) */
         .product-panel { background: transparent; padding: calc(10vh + 14px) 0 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; container-type: inline-size; }
-        .panel-label { display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; margin-bottom: 6px; }
+        .panel-label { display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); text-transform: uppercase; font-size: 0.86rem; letter-spacing: 0.12em; margin-bottom: 6px; }
         .panel-label .mini-pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 7px; background: var(--surface-raised); }
-        .start-over-button { border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 10px; background: rgba(20, 17, 16, 0.6); color: #fff; font-size: 0.66rem; font-weight: 700; text-transform: none; letter-spacing: normal; cursor: pointer; }
+        .start-over-button { border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 10px; background: rgba(20, 17, 16, 0.6); color: #fff; font-size: 0.8rem; font-weight: 700; text-transform: none; letter-spacing: normal; cursor: pointer; }
         .start-over-button:hover:not(:disabled) { background: rgba(20, 17, 16, 0.8); }
         .start-over-button:disabled { opacity: 0.5; cursor: not-allowed; }
         .product-panel h1 { margin: 4px 0 0; font-size: clamp(1.8rem, 3vw, 2.6rem); line-height: 1.05; letter-spacing: -0.06em; font-weight: 700; color: var(--text); }
@@ -1745,9 +1745,10 @@ function OrderSection() {
         /* 6-inch = a footlong cut in half: hide the right half, then slide the rest back to the board's centre
            (the sandwich spans ~7–93% of the board, so its left half is centred at 28.5%: 50 - 28.5 = 21.5) */
         .sandwich-stack.six-inch { clip-path: inset(-100% 50% -100% -20%); transform: translateX(calc(21.5% * var(--stretch-x))) scaleX(var(--stretch-x)); }
-        /* on a wrapper, so the shadows are drawn after the cut: #cut-shade darkens the cut end, drop-shadow falls beside it */
+        /* on a wrapper, so the shadow is drawn after the cut and falls beside the cut end. plain CSS shadows only: an SVG
+           url(#filter) here was rasterised in tiles by Chrome's GPU path, leaving blocky gaps and shifted strips in the sub */
         .sandwich-cut { width: 100%; }
-        .sandwich-cut.six-inch { filter: url(#cut-shade) drop-shadow(4px 2px 5px rgba(30, 18, 10, 0.1)); }
+        .sandwich-cut.six-inch { filter: drop-shadow(4px 2px 5px rgba(30, 18, 10, 0.1)); }
         .layer { display: block; width: 88%; height: auto; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(40, 26, 17, 0.28)); }
         /* fillings and the bottom bread get their width + margins inline (see layerStyle) because each PNG has different padding */
         .ingredient-layer {
@@ -1764,7 +1765,7 @@ function OrderSection() {
           padding: 0 10px;
         }
         .ingredient-layer span {
-          font-size: 0.64rem;
+          font-size: 0.8rem;
           font-weight: 700;
           color: #fff;
           text-shadow: 0 1px 2px rgba(0,0,0,0.75);
@@ -1776,13 +1777,13 @@ function OrderSection() {
           border-radius: 999px;
           background: rgba(20, 17, 16, 0.72);
           text-align: center;
-          font-size: 0.72rem;
+          font-size: 0.86rem;
           color: #fff;
         }
 
         .builder-panel { position: relative; background: transparent; padding: calc(10vh + 14px) 18px 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
         .mode-switcher { position: relative; flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin-bottom: 12px; border-radius: 999px; background: var(--surface-raised); border: 1px solid var(--line); box-shadow: 0 4px 12px rgba(31, 35, 33, 0.06); }
-        .mode-tab { border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); padding: 9px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+        .mode-tab { border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); padding: 9px 14px; font-size: 0.94rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
         .mode-tab:hover { color: var(--text); }
         .mode-tab.active { background: var(--text); color: var(--bg); box-shadow: 0 4px 10px rgba(31, 35, 33, 0.2); }
         .mode-tab svg { width: 15px; height: 15px; flex: none; }
@@ -1795,7 +1796,7 @@ function OrderSection() {
         .builder-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .builder-title { margin: 0; font-size: clamp(1.5rem, 2vw, 2.2rem); line-height: 1.1; letter-spacing: -0.05em; font-weight: 700; color: var(--text); }
         .builder-tabs { display: flex; gap: 10px; list-style: none; margin: 0 0 10px; padding: 0; flex-wrap: wrap; }
-        .tab-button { border: 1px solid var(--line); border-radius: 999px; color: var(--text-muted); background: var(--surface-raised); font-size: 0.75rem; font-weight: 600; padding: 8px 14px; cursor: pointer; transition: all 0.2s ease; }
+        .tab-button { border: 1px solid var(--line); border-radius: 999px; color: var(--text-muted); background: var(--surface-raised); font-size: 0.9rem; font-weight: 600; padding: 8px 14px; cursor: pointer; transition: all 0.2s ease; }
         .tab-button:hover { color: var(--text); background: var(--surface-hover); }
         .tab-button.active { background: var(--text); color: var(--bg); border-color: var(--text); }
         /* the Suggestion tab is tinted with the accent so it stands out from the ingredient tabs */
@@ -1821,20 +1822,20 @@ function OrderSection() {
         /* photos on a light background: brightness turns the grey into white, and multiply makes white disappear.
            No drop-shadow here, it would outline the photo's rectangle (the photos have their own shadow) */
         .topping-swatch.cutout.photo img { mix-blend-mode: multiply; filter: brightness(1.08); transform: scale(var(--photo-zoom)); }
-        .topping-item .name { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+        .topping-item .name { font-size: 0.98rem; color: var(--text-muted); font-weight: 600; }
         .topping-item.selected .name { color: var(--text); }
         .size-picker { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; max-width: 100%; }
         .size-picker.portion-picker { gap: 4px; }
-        .size-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text-muted); padding: 6px 10px; font-size: 0.68rem; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
-        .size-picker.portion-picker .size-button { padding: 6px 7px; font-size: 0.64rem; }
+        .size-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text-muted); padding: 6px 10px; font-size: 0.82rem; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .size-picker.portion-picker .size-button { padding: 6px 7px; font-size: 0.8rem; }
         .size-button:hover:not(:disabled):not(.active):not(.over-limit) { background: rgba(31, 35, 33, 0.06); color: var(--text); border-color: var(--text-muted); }
         .size-button.active { color: var(--bg); background: var(--text); border-color: var(--text); }
         .size-button:disabled, .size-button.over-limit { color: var(--text-faint); opacity: 0.5; cursor: not-allowed; }
 
         /* portion-limit reminder: slides in at the top of the right-hand panel */
         .limit-notice { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(360px, calc(100% - 24px)); z-index: 5; display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; border-radius: 14px; background: var(--field); border: 1px solid rgba(179, 38, 30, 0.35); border-left: 4px solid var(--accent); box-shadow: 0 14px 30px rgba(31, 35, 33, 0.18); animation: noticeIn 0.25s ease-out; }
-        .limit-notice strong { display: block; font-size: 0.82rem; color: var(--text); }
-        .limit-notice p { margin: 2px 0 0; font-size: 0.72rem; line-height: 1.4; color: var(--text-muted); }
+        .limit-notice strong { display: block; font-size: 0.98rem; color: var(--text); }
+        .limit-notice p { margin: 2px 0 0; font-size: 0.86rem; line-height: 1.4; color: var(--text-muted); }
         .limit-notice-close { flex: none; margin-left: auto; border: 0; background: transparent; color: var(--text-muted); font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
         .limit-notice-close:hover { color: var(--text); background: var(--surface-hover); }
         @keyframes noticeIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.94); } to { opacity: 1; transform: translate(-50%, -50%); } }
@@ -1847,16 +1848,16 @@ function OrderSection() {
         .sandwich-side-stack { width: 100%; display: flex; flex-direction: column-reverse; align-items: center; }
         .suggestion-sauces { position: absolute; right: 4px; bottom: 4px; display: flex; }
         .suggestion-sauces img { width: clamp(20px, 22%, 34px); height: auto; filter: drop-shadow(0 2px 3px rgba(40, 26, 17, 0.3)); }
-        .suggestion-name { font-size: 0.86rem; font-weight: 700; }
-        .suggestion-detail { font-size: 0.66rem; line-height: 1.35; color: var(--text-muted); }
-        .suggestion-price { margin-top: auto; padding-top: 4px; font-size: 0.78rem; font-weight: 700; }
+        .suggestion-name { font-size: 1.03rem; font-weight: 700; }
+        .suggestion-detail { font-size: 0.8rem; line-height: 1.35; color: var(--text-muted); }
+        .suggestion-price { margin-top: auto; padding-top: 4px; font-size: 0.94rem; font-weight: 700; }
 
-        .builder-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.7rem; color: var(--text-muted); }
-        .pricing-note { flex: none; margin: 6px 0 0; font-size: 0.66rem; color: var(--text-faint); }
+        .builder-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.84rem; color: var(--text); }
+        .pricing-note { flex: none; margin: 6px 0 0; font-size: 0.8rem; color: var(--text-muted); }
         .builder-summary-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-        .undo-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); padding: 4px 8px; color: var(--text); font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .undo-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); padding: 4px 8px; color: var(--text); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
         .undo-button:hover:not(:disabled) { background: var(--surface-hover); }
-        .undo-button:disabled { opacity: 0.45; cursor: not-allowed; }
+        .undo-button:disabled { opacity: 0.65; cursor: not-allowed; }
         .summary-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); }
         .summary-pill strong { color: var(--text); }
 
@@ -1867,34 +1868,34 @@ function OrderSection() {
         /* staff on the left, conversation on the right, like a messaging app (the other person left, you right) */
         .chat-popup-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: clamp(175px, 40%, 240px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
         .chat-conversation { min-width: 0; min-height: 0; padding: 12px 14px 10px 6px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
-        .chat-kicker { flex: none; margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+        .chat-kicker { flex: none; margin: 0; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
         .chat-staff { position: relative; min-height: 220px; background: radial-gradient(ellipse 85% 55% at 50% 100%, rgba(214, 42, 42, 0.12), transparent 72%); }
         .chat-staff img { position: absolute; inset: 0; width: 100%; height: 100%; padding-top: 8px; object-fit: contain; object-position: center bottom; transform-origin: 50% 100%; filter: drop-shadow(0 6px 10px rgba(31, 35, 33, 0.18)); pointer-events: none; }
         /* while busy, the staff member gently grows and shrinks (from the feet, so he stays standing in place) */
         .chat-staff.processing img { animation: staffPulse 1.4s ease-in-out infinite; }
         @keyframes staffPulse { 50% { transform: scale(1.03); } }
-        .avatar-status { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 14px); width: max-content; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 2px 8px var(--shadow); font-size: 0.64rem; font-weight: 700; line-height: 1.25; color: var(--text); text-align: center; }
+        .avatar-status { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 14px); width: max-content; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 2px 8px var(--shadow); font-size: 0.8rem; font-weight: 700; line-height: 1.25; color: var(--text); text-align: center; }
         .chat-staff.error .avatar-status { color: var(--danger); box-shadow: 0 0 0 2px rgba(179, 38, 30, 0.25); }
 
         .chat-log { flex: 1 1 0; min-height: 90px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; background: transparent; display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 6px; }
         /* the staff's bubble: light, on the left beside the staff member, square bottom-left corner pointing at them */
         .speech { flex: none; align-self: flex-start; margin: 0; position: relative; background: var(--field); border: 2px solid var(--text); border-radius: 18px 18px 18px 0; padding: 10px 14px 8px; max-width: 100%; overflow-wrap: anywhere; box-shadow: 0 6px 14px var(--shadow); }
-        .speech p { margin: 0; font-size: 0.86rem; line-height: 1.4; color: var(--text); }
+        .speech p { margin: 0; font-size: 1.03rem; line-height: 1.4; color: var(--text); }
         /* the customer's bubble: dark, on the right, square bottom-right corner */
         .speech.from-user { align-self: flex-end; margin: 0; background: var(--text); border-color: var(--text); border-radius: 18px 18px 0 18px; }
         .speech.from-user p { color: var(--bg); }
-        .speech .tiny { font-size: 0.68rem; opacity: 0.85; margin-top: 6px; color: var(--text-muted); }
+        .speech .tiny { font-size: 0.82rem; opacity: 0.85; margin-top: 6px; color: var(--text-muted); }
         .chat-footer { flex: none; padding: 10px 14px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
         .chat-controls { flex: none; display: flex; flex-direction: column; gap: 8px; }
-        .chat-error { flex: none; font-size: 0.72rem; color: var(--danger); }
+        .chat-error { flex: none; font-size: 0.86rem; color: var(--danger); }
         .retry-button { border: 0; background: transparent; color: var(--danger); font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0 0 0 4px; }
         .chat-form { display: flex; gap: 8px; }
-        .chat-input { flex: 1; border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 13px; font-size: 0.76rem; background: var(--field); color: var(--text); }
+        .chat-input { flex: 1; border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 13px; font-size: 0.91rem; background: var(--field); color: var(--text); }
         .chat-input::placeholder, .checkout-input::placeholder { color: var(--text-faint); }
-        .chat-send { border: 0; border-radius: 999px; background: var(--text); color: var(--bg); font-size: 0.72rem; font-weight: 700; padding: 8px 14px; cursor: pointer; }
+        .chat-send { border: 0; border-radius: 999px; background: var(--text); color: var(--bg); font-size: 0.86rem; font-weight: 700; padding: 8px 14px; cursor: pointer; }
         .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
         .voice-controls { display: flex; align-items: center; gap: 8px; }
-        .voice-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text); padding: 8px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease; }
+        .voice-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text); padding: 8px 12px; font-size: 0.86rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease; }
         .voice-button svg { width: 14px; height: 14px; flex: none; }
         .voice-button:hover:not(:disabled) { background: var(--surface-hover); }
         /* "Voice replies: On" */
@@ -1905,17 +1906,17 @@ function OrderSection() {
         .voice-button.primary:hover:not(:disabled) { background: #313734; }
         .voice-button.primary.listening { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(214, 42, 42, 0.22); }
         .voice-button.primary.listening:hover:not(:disabled) { background: var(--accent-hover); }
-        .heard-card { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); font-size: 0.7rem; color: var(--text-muted); }
+        .heard-card { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); font-size: 0.84rem; color: var(--text-muted); }
         .heard-card strong { display: block; margin-bottom: 2px; color: var(--text); }
         .heard-actions { display: flex; gap: 5px; }
-        .chat-help { flex: none; margin: 0; font-size: 0.66rem; line-height: 1.35; color: var(--text-muted); }
-        .privacy-note { flex: none; margin: 0; font-size: 0.62rem; line-height: 1.35; color: var(--text-faint); }
+        .chat-help { flex: none; margin: 0; font-size: 0.8rem; line-height: 1.35; color: var(--text-muted); }
+        .privacy-note { flex: none; margin: 0; font-size: 0.8rem; line-height: 1.35; color: var(--text-faint); }
 
         .order-summary { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .summary-meta { color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .summary-meta { color: var(--text); font-size: 0.86rem; letter-spacing: 0.08em; text-transform: uppercase; }
         .summary-main { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; }
         .summary-main .price { font-size: 2.1rem; letter-spacing: -0.06em; font-weight: 800; color: var(--text); }
-        .summary-main .price small { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.03em; margin-left: 6px; }
+        .summary-main .price small { font-size: 0.96rem; color: var(--text); font-weight: 600; letter-spacing: 0.03em; margin-left: 6px; }
         .qty-box { display: flex; align-items: center; gap: 8px; background: var(--field); border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px; font-weight: 700; color: var(--text); }
         .operator { width: 28px; height: 28px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--surface-hover); color: var(--text); cursor: pointer; font-size: 1rem; line-height: 1; }
         .operator:disabled { cursor: not-allowed; opacity: 0.45; }
@@ -1923,28 +1924,28 @@ function OrderSection() {
         .cta-button:hover:not(:disabled) { background: var(--accent-hover); }
         /* "Added to bag ✓": done, until the next ingredient or suggestion starts a new sub */
         .cta-button:disabled { background: var(--text); box-shadow: none; cursor: default; }
-        .confirmation { margin-top: 7px; font-size: 0.72rem; color: var(--text-muted); max-width: 220px; }
-        .order-error { margin: 7px 0 0; font-size: 0.72rem; color: var(--danger); max-width: 260px; }
+        .confirmation { margin-top: 7px; font-size: 0.86rem; color: var(--text); max-width: 220px; }
+        .order-error { margin: 7px 0 0; font-size: 0.86rem; color: var(--danger); max-width: 260px; }
         .cart-panel { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); }
-        .cart-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.78rem; }
+        .cart-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.94rem; }
         .cart-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; max-height: 18vh; overflow-y: auto; scrollbar-width: thin; }
-        .cart-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px; border-radius: 10px; background: var(--field); font-size: 0.7rem; }
+        .cart-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 8px; border-radius: 10px; background: var(--field); font-size: 0.84rem; }
         .cart-item p { margin: 2px 0 0; color: var(--text-muted); }
         .cart-item.editing { box-shadow: inset 3px 0 0 var(--accent); }
-        .editing-tag { border: 1px solid rgba(214, 42, 42, 0.35); border-radius: 999px; background: rgba(214, 42, 42, 0.08); padding: 4px 8px; font-size: 0.68rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
+        .editing-tag { border: 1px solid rgba(214, 42, 42, 0.35); border-radius: 999px; background: rgba(214, 42, 42, 0.08); padding: 4px 8px; font-size: 0.82rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
         /* Edit / Remove / On the counter: same pill frame, spaced apart */
         .cart-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-        .cart-remove { border: 1px solid rgba(179, 38, 30, 0.35); border-radius: 999px; background: var(--surface-raised); padding: 4px 8px; color: var(--danger); font-size: 0.68rem; font-weight: 700; cursor: pointer; }
+        .cart-remove { border: 1px solid rgba(179, 38, 30, 0.35); border-radius: 999px; background: var(--surface-raised); padding: 4px 8px; color: var(--danger); font-size: 0.82rem; font-weight: 700; cursor: pointer; }
         .cart-remove:hover { background: rgba(179, 38, 30, 0.08); }
         .fulfillment-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 10px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
-        .fulfillment-button { border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); padding: 7px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+        .fulfillment-button { border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); padding: 7px 10px; font-size: 0.86rem; font-weight: 700; cursor: pointer; }
         .fulfillment-button:hover:not(.active) { color: var(--text); background: var(--surface-hover); }
         .fulfillment-button.active { background: var(--text); color: var(--bg); }
         .checkout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .checkout-wide { grid-column: 1 / -1; }
-        .checkout-input { border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 10px; background: var(--field); color: var(--text); font-size: 0.72rem; }
-        .cart-total-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.76rem; font-weight: 700; }
-        .checkout-button { border: 0; border-radius: 999px; background: var(--accent); color: #fff; padding: 8px 12px; font-size: 0.7rem; font-weight: 700; cursor: pointer; }
+        .checkout-input { border: 1px solid var(--line-strong); border-radius: 999px; padding: 8px 10px; background: var(--field); color: var(--text); font-size: 0.86rem; }
+        .cart-total-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.91rem; font-weight: 700; }
+        .checkout-button { border: 0; border-radius: 999px; background: var(--accent); color: #fff; padding: 8px 12px; font-size: 0.84rem; font-weight: 700; cursor: pointer; }
         .checkout-button:hover { background: var(--accent-hover); }
         /* checkout popup: above everything, navbar included */
         .checkout-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(20, 17, 16, 0.45); backdrop-filter: blur(2px); animation: overlayIn 0.2s ease-out; }
@@ -1952,10 +1953,10 @@ function OrderSection() {
         .checkout-dialog h2 { margin: 0; font-size: 1.4rem; letter-spacing: -0.03em; color: var(--text); }
         .checkout-form { display: flex; flex-direction: column; gap: 12px; }
         .checkout-form .fulfillment-picker { margin-top: 0; }
-        .checkout-summary { margin: 0; font-size: 0.8rem; line-height: 1.5; color: var(--text-muted); }
-        .checkout-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
-        .checkout-dialog .checkout-input { border-radius: 12px; padding: 10px 12px; font-size: 0.86rem; font-weight: 400; }
-        .checkout-error { margin: 0; font-size: 0.76rem; color: var(--danger); }
+        .checkout-summary { margin: 0; font-size: 0.96rem; line-height: 1.5; color: var(--text-muted); }
+        .checkout-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.86rem; font-weight: 700; color: var(--text-muted); }
+        .checkout-dialog .checkout-input { border-radius: 12px; padding: 10px 12px; font-size: 1.03rem; font-weight: 400; }
+        .checkout-error { margin: 0; font-size: 0.91rem; color: var(--danger); }
         .checkout-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
         .checkout-cancel { border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; padding: 10px 16px; color: var(--text); font-weight: 700; cursor: pointer; }
         .checkout-cancel:hover { background: var(--surface-hover); }
@@ -1966,12 +1967,12 @@ function OrderSection() {
         .success-check path { fill: none; stroke: #2e9d57; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 61; stroke-dashoffset: 61; animation: drawStroke 0.35s ease-out 0.6s forwards; }
         @keyframes drawStroke { to { stroke-dashoffset: 0; } }
         @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
-        .email-status { margin: 0; font-size: 0.76rem; color: var(--text-muted); }
+        .email-status { margin: 0; font-size: 0.91rem; color: var(--text-muted); }
         .email-request { width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
         .email-request .checkout-cancel { align-self: center; }
         .email-status.sent { color: #2e7d4f; }
         .email-status.failed { color: var(--danger); }
-        .checkout-message { margin: 8px 0 0; font-size: 0.7rem; color: var(--text-muted); }
+        .checkout-message { margin: 8px 0 0; font-size: 0.84rem; color: var(--text-muted); }
         button:focus-visible, input:focus-visible { outline: 3px solid rgba(240, 74, 66, 0.6); outline-offset: 2px; }
 
         /* single column on narrow screens: too much to fit in one screen, so the page scrolls normally again */
@@ -2057,20 +2058,6 @@ function OrderSection() {
                 </div>
                 {/* column-reverse: first child sits at the bottom, so this list reads plate → bread → fillings → bread */}
                 <div className="sandwich-build" aria-hidden="true">
-                  {/* inner shadow along right-facing edges: whatever lies within ~20px of the cut gets darker */}
-                  <svg width="0" height="0" style={{ position: "absolute" }}>
-                    <filter id="cut-shade" x="-50%" y="-150%" width="200%" height="400%" colorInterpolationFilters="sRGB">
-                      <feOffset in="SourceAlpha" dx="-16" dy="0" result="moved" />
-                      <feGaussianBlur in="moved" stdDeviation="9 0" result="soft" />
-                      <feFlood floodColor="#2a1608" floodOpacity="0.2" />
-                      <feComposite in2="soft" operator="out" result="edge" />
-                      <feComposite in="edge" in2="SourceAlpha" operator="in" result="shade" />
-                      <feMerge>
-                        <feMergeNode in="SourceGraphic" />
-                        <feMergeNode in="shade" />
-                      </feMerge>
-                    </filter>
-                  </svg>
                   <img className="plate" src={woodenPlate} alt="" />
                   <div className={`sandwich-cut${sandwichSize === "6-inch" ? " six-inch" : ""}`}>
                   <div className={`sandwich-stack${sandwichSize === "6-inch" ? " six-inch" : ""}`}>

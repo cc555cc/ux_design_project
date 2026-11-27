@@ -25,6 +25,7 @@ def load_env_file(path):
 #must run before the route modules are imported, since some of them read the environment
 load_env_file(Path(__file__).resolve().parent.parent / ".env")
 
+from routes.auth import handle_reset_code, handle_verify_reset
 from routes.chat import handle_chat, handle_reset, handle_session
 from routes.menu import handle_menu
 from routes.orders import handle_confirmation_email, handle_list_orders
@@ -41,6 +42,8 @@ ROUTES = {
     ("GET", "/api/menu"): handle_menu,
     ("GET", "/api/orders"): handle_list_orders,
     ("POST", "/api/orders/confirmation-email"): handle_confirmation_email,
+    ("POST", "/api/auth/reset-code"): handle_reset_code,
+    ("POST", "/api/auth/verify-reset"): handle_verify_reset,
 }
 
 

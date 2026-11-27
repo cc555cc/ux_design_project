@@ -174,7 +174,7 @@ function ShopList({selectedStore, onSelect}: {selectedStore: string | null; onSe
         </svg>
         {locating ? "Finding you…" : "Find the nearest pickup"}
       </button>
-      {locateError ? <p role="alert" className="text-sm text-red-700">{locateError}</p> : null}
+      {locateError ? <p role="alert" className="text-base text-red-700">{locateError}</p> : null}
 
       <ul className="flex flex-col gap-3 overflow-y-auto">
         {SHOPS.map(shop => (
@@ -189,11 +189,11 @@ function ShopList({selectedStore, onSelect}: {selectedStore: string | null; onSe
             >
               <img src={shopPic} alt="" className="h-8 w-8 shrink-0" />
               <div>
-                <h3 className="font-gasoek text-lg text-gray-900">{shop.name}</h3>
-                <p className="text-sm text-gray-700">Pickup &amp; walk-in orders welcome</p>
+                <h3 className="font-gasoek text-xl text-gray-900">{shop.name}</h3>
+                <p className="text-base text-gray-700">Pickup &amp; walk-in orders welcome</p>
               </div>
               {distances ? (
-                <span className={`ml-auto shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                <span className={`ml-auto shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${
                   shop.name === nearest ? "bg-[#D62828] text-white" : "bg-gray-100 text-gray-700"
                 }`}>
                   {shop.name === nearest ? "Nearest · " : ""}{distances[shop.name].toFixed(1)} km

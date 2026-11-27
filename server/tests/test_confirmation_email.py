@@ -1,7 +1,6 @@
 #tests for POST /api/orders/confirmation-email: input checks, the send limit, and the email text.
 #no email is really sent: send_confirmation is replaced with a mock. run from the server folder with:
 #   python -m unittest discover tests
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -87,40 +86,17 @@ class ConfirmationTextTestCase(unittest.TestCase):
                 mailer.check_configured()
 
 
-class BrevoTestCase(unittest.TestCase):
+class SmtpTestCase(unittest.TestCase):
     def setUp(self):
         self.order, _ = orders.validate_confirmation(dict(VALID))
 
-    def test_brevo_is_used_when_its_key_is_set(self):
-        env = {"BREVO_API_KEY": "test-key", "MAIL_FROM": "shop@example.com", "SMTP_HOST": "smtp.gmail.com"}
-        with mock.patch.dict(mailer.os.environ, env, clear=True), \
-                mock.patch.object(mailer.urllib.request, "urlopen") as urlopen, \
-                mock.patch.object(mailer.smtplib, "SMTP") as smtp:
-            mailer.send_confirmation(self.order)
-
-        smtp.assert_not_called()
-        request = urlopen.call_args.args[0]
-        self.assertEqual(request.full_url, mailer.BREVO_URL)
-        self.assertEqual(request.get_header("Api-key"), "test-key")
-        body = json.loads(request.data)
-        self.assertEqual(body["sender"]["email"], "shop@example.com")
-        self.assertEqual(body["to"][0]["email"], "customer@example.com")
-        self.assertIn("$8.24", body["textContent"])
-
-    def test_brevo_needs_a_sender(self):
-        with mock.patch.dict(mailer.os.environ, {"BREVO_API_KEY": "test-key"}, clear=True):
-            with self.assertRaises(mailer.MailNotConfigured):
-                mailer.check_configured()
-
-    def test_smtp_is_used_without_a_brevo_key(self):
+    def test_smtp_sends_with_gmail_app_password_spaces_removed(self):
         env = {"SMTP_HOST": "smtp.gmail.com", "SMTP_USER": "shop@gmail.com", "SMTP_PASSWORD": "abcd efgh ijkl mnop"}
         with mock.patch.dict(mailer.os.environ, env, clear=True), \
-                mock.patch.object(mailer.urllib.request, "urlopen") as urlopen, \
                 mock.patch.object(mailer.ssl, "create_default_context"), \
                 mock.patch.object(mailer.smtplib, "SMTP") as smtp:
             mailer.send_confirmation(self.order)
 
-        urlopen.assert_not_called()
         smtp.return_value.__enter__.return_value.login.assert_called_once_with("shop@gmail.com", "abcdefghijklmnop")
 
 

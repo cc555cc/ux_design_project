@@ -353,6 +353,20 @@ function titleForCategory(category: ProductOption): string {
   }
 }
 
+const breadSizes = ["6-inch", "Footlong"] as const
+const toppingPortionLevels = [
+  { label: "Small", amount: 1 },
+  { label: "Normal", amount: 2 },
+  { label: "Large", amount: 3 },
+] as const
+const breadOptionNames = new Set(
+  toppingOptions.filter((option) => option.category === "Bread").map((option) => option.name)
+)
+type BuilderSnapshot = {
+  toppingAmounts: ToppingAmounts
+  sandwichSize: string
+}
+
 function OrderSection() {
   const [orderMode, setOrderMode] = useState<OrderMode>("menu")
   const [activeCategory, setActiveCategory] = useState<ProductOption>("Bread")
@@ -368,7 +382,7 @@ function OrderSection() {
   const [chatError, setChatError] = useState<string | null>(null)
   const [chatTotal, setChatTotal] = useState<number | null>(null)
   const [orderError, setOrderError] = useState<string | null>(null)
-  const [undoSnapshot, setUndoSnapshot] = useState<ToppingAmounts | null>(null)
+  const [undoSnapshot, setUndoSnapshot] = useState<BuilderSnapshot | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [heardText, setHeardText] = useState("")
@@ -401,7 +415,14 @@ function OrderSection() {
     () =>
       toppingOptions
         .filter((option) => toppingAmounts[option.name] > 0)
-        .map((option) => `${option.name}${toppingAmounts[option.name] > 1 ? ` × ${toppingAmounts[option.name]}` : ""}`),
+        .map((option) => {
+          const amount = toppingAmounts[option.name]
+          if (option.category !== "Bread") {
+            const level = toppingPortionLevels.find((entry) => entry.amount === amount)
+            return level ? `${option.name} (${level.label})` : option.name
+          }
+          return option.name
+        }),
     [toppingAmounts]
   )
 
@@ -412,6 +433,15 @@ function OrderSection() {
 
   const selectedIngredientCount = useMemo(
     () => Object.values(toppingAmounts).reduce((total, amount) => total + amount, 0),
+    [toppingAmounts]
+  )
+
+  const nonBreadIngredientCount = useMemo(
+    () =>
+      Object.entries(toppingAmounts).reduce(
+        (total, [name, amount]) => (breadOptionNames.has(name) ? total : total + amount),
+        0
+      ),
     [toppingAmounts]
   )
 
@@ -667,24 +697,44 @@ function OrderSection() {
     }
   }
 
-  function adjustToppingAmount(name: string, delta: number) {
-    setToppingAmounts((current) => {
-      const currentTotal = Object.values(current).reduce((total, amount) => total + amount, 0)
-      if (delta > 0 && currentTotal >= maxIngredientPortions) return current
-      setUndoSnapshot({ ...current })
+  function selectToppingPortion(name: string, targetAmount: number) {
+    const currentAmount = toppingAmounts[name] ?? 0
+    const nextAmount = currentAmount === targetAmount ? 0 : targetAmount
 
-      return {
-        ...current,
-        [name]: Math.min(3, Math.max(0, (current[name] ?? 0) + delta)),
-      }
-    })
+    if (selectedIngredientCount - currentAmount + nextAmount > maxIngredientPortions) return
+
+    setUndoSnapshot({ toppingAmounts: { ...toppingAmounts }, sandwichSize })
+    setToppingAmounts({ ...toppingAmounts, [name]: nextAmount })
+    setChatTotal(null)
+    setOrderError(null)
+  }
+
+  function selectBreadSize(breadName: string, size: string) {
+    const selectedBreadNames = [...breadOptionNames].filter((name) => (toppingAmounts[name] ?? 0) > 0)
+    const isSameSelection =
+      selectedBreadNames.length === 1 && selectedBreadNames[0] === breadName && sandwichSize === size
+
+    if (!isSameSelection && nonBreadIngredientCount + 1 > maxIngredientPortions) return
+
+    setUndoSnapshot({ toppingAmounts: { ...toppingAmounts }, sandwichSize })
+
+    const nextAmounts: ToppingAmounts = { ...toppingAmounts }
+    for (const name of breadOptionNames) nextAmounts[name] = 0
+
+    if (!isSameSelection) {
+      nextAmounts[breadName] = 1
+      setSandwichSize(size)
+    }
+
+    setToppingAmounts(nextAmounts)
     setChatTotal(null)
     setOrderError(null)
   }
 
   function undoLastChange() {
     if (!undoSnapshot) return
-    setToppingAmounts(undoSnapshot)
+    setToppingAmounts(undoSnapshot.toppingAmounts)
+    setSandwichSize(undoSnapshot.sandwichSize)
     setUndoSnapshot(null)
     setChatTotal(null)
     setOrderError(null)
@@ -1088,7 +1138,7 @@ function OrderSection() {
         /* takes whatever height is left in the column and scrolls inside itself; the 4px padding keeps the
            selected cards' outline from being clipped at the scroll edges */
         .topping-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; align-content: start; display: grid; grid-auto-rows: max-content; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0 -4px; padding: 4px; }
-        .topping-item { overflow: hidden; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px 10px 12px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; min-height: 180px; }
+        .topping-item { overflow: hidden; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px 8px 12px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; min-height: 180px; }
         .topping-item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(224, 54, 47, 0.25); }
         .topping-swatch { flex: none; width: clamp(84px, 55%, 120px); aspect-ratio: 1; border-radius: 14px; border: 1px solid var(--line); overflow: hidden; background: var(--field); }
         .topping-swatch img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1102,11 +1152,13 @@ function OrderSection() {
         .topping-swatch.cutout.photo img { mix-blend-mode: multiply; filter: brightness(1.08); transform: scale(var(--photo-zoom)); }
         .topping-item .name { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
         .topping-item.selected .name { color: var(--text); }
-        .topping-stepper { display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--field); }
-        .topping-stepper button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--text); font-size: 1rem; line-height: 1; cursor: pointer; }
-        .topping-stepper button:hover:not(:disabled) { background: var(--surface-hover); }
-        .topping-stepper button:disabled { color: var(--text-faint); opacity: 0.5; cursor: not-allowed; }
-        .topping-stepper .amount { min-width: 18px; text-align: center; font-size: 0.84rem; font-weight: 700; color: var(--text); }
+        .size-picker { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+        .size-picker.portion-picker { gap: 4px; }
+        .size-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--field); color: var(--text-muted); padding: 6px 10px; font-size: 0.68rem; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .size-picker.portion-picker .size-button { padding: 6px 7px; font-size: 0.64rem; }
+        .size-button:hover:not(:disabled):not(.active) { background: rgba(31, 35, 33, 0.06); color: var(--text); border-color: var(--text-muted); }
+        .size-button.active { color: var(--bg); background: var(--text); border-color: var(--text); }
+        .size-button:disabled { color: var(--text-faint); opacity: 0.5; cursor: not-allowed; }
 
         .builder-summary { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.7rem; color: var(--text-muted); }
         .builder-summary-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -1115,9 +1167,6 @@ function OrderSection() {
         .undo-button:disabled { opacity: 0.45; cursor: not-allowed; }
         .summary-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-raised); }
         .summary-pill strong { color: var(--text); }
-        .size-picker { display: flex; gap: 6px; margin-top: 8px; }
-        .size-button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--text-muted); padding: 5px 10px; font-size: 0.66rem; font-weight: 700; cursor: pointer; }
-        .size-button.active { color: var(--bg); background: var(--text); border-color: var(--text); }
 
         .order-column { flex: none; margin-top: 12px; }
 
@@ -1381,7 +1430,9 @@ function OrderSection() {
                       <div className="topping-grid">
                         {visibleToppings.map((topping) => {
                           const amount = toppingAmounts[topping.name] ?? 0
-                          const isSelected = amount > 0
+                          const isBread = topping.category === "Bread"
+                          const isSelected = isBread ? previewBread?.name === topping.name : amount > 0
+                          const breadDisabled = isBread && !isSelected && nonBreadIngredientCount >= maxIngredientPortions
                           return (
                             <div
                               key={topping.name}
@@ -1390,25 +1441,46 @@ function OrderSection() {
                               <div className={`topping-swatch${topping.icon ? " cutout" : ""}${topping.category === "Sauce" ? " bowl" : ""}${topping.photoZoom ? " photo" : ""}`} style={{ "--photo-zoom": topping.photoZoom } as CSSProperties} aria-hidden="true">
                                 <img src={topping.icon ?? topping.image} alt="" loading="lazy" />
                               </div>
-                              <div className="topping-stepper" aria-label={`${topping.name} quantity`}>
-                                <button
-                                  type="button"
-                                  onClick={() => adjustToppingAmount(topping.name, -1)}
-                                  disabled={amount === 0}
-                                  aria-label={`Remove one portion of ${topping.name}`}
-                                >
-                                  −
-                                </button>
-                                <span className="amount" aria-live="polite">{amount}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => adjustToppingAmount(topping.name, 1)}
-                                  disabled={amount === 3 || selectedIngredientCount >= maxIngredientPortions}
-                                  aria-label={`Add one portion of ${topping.name}`}
-                                >
-                                  +
-                                </button>
-                              </div>
+                              {isBread ? (
+                                <div className="size-picker" role="group" aria-label={`${topping.name} size`}>
+                                  {breadSizes.map((size) => {
+                                    const isActiveSize = isSelected && sandwichSize === size
+                                    return (
+                                      <button
+                                        key={size}
+                                        type="button"
+                                        className={`size-button${isActiveSize ? " active" : ""}`}
+                                        onClick={() => selectBreadSize(topping.name, size)}
+                                        disabled={breadDisabled}
+                                        aria-pressed={isActiveSize}
+                                        aria-label={`${topping.name} ${size}`}
+                                      >
+                                        {size}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="size-picker portion-picker" role="group" aria-label={`${topping.name} portion`}>
+                                  {toppingPortionLevels.map(({ label, amount: levelAmount }) => {
+                                    const isActiveLevel = amount === levelAmount
+                                    const isDisabled = !isActiveLevel && selectedIngredientCount - amount + levelAmount > maxIngredientPortions
+                                    return (
+                                      <button
+                                        key={label}
+                                        type="button"
+                                        className={`size-button${isActiveLevel ? " active" : ""}`}
+                                        onClick={() => selectToppingPortion(topping.name, levelAmount)}
+                                        disabled={isDisabled}
+                                        aria-pressed={isActiveLevel}
+                                        aria-label={`${topping.name} ${label}`}
+                                      >
+                                        {label}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
                               <div className="name">{topping.name}</div>
                             </div>
                           )
@@ -1430,19 +1502,6 @@ function OrderSection() {
                         <span className="summary-pill">
                           <strong>{selectedIngredientCount} / {maxIngredientPortions}</strong> portions
                         </span>
-                      </div>
-                      <div className="size-picker" aria-label="Sandwich size">
-                        {["6-inch", "Footlong"].map((size) => (
-                          <button
-                            key={size}
-                            type="button"
-                            className={`size-button${sandwichSize === size ? " active" : ""}`}
-                            onClick={() => setSandwichSize(size)}
-                            aria-pressed={sandwichSize === size}
-                          >
-                            {size}
-                          </button>
-                        ))}
                       </div>
                   </div>
                 ) : (

@@ -6,7 +6,7 @@ import threading
 import time
 
 from db.order_store import load_orders
-from mailer import MailNotConfigured, send_confirmation, smtp_settings
+from mailer import MailNotConfigured, check_configured, send_confirmation
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SIZES = {"6-inch", "Footlong"}
@@ -110,7 +110,7 @@ def handle_confirmation_email(payload):
     if error:
         return 400, {"error": error}
     try:
-        smtp_settings()  #checked first, so an unconfigured server doesn't use up the send limit
+        check_configured()  #checked first, so an unconfigured server doesn't use up the send limit
     except MailNotConfigured as not_configured:
         return 503, {"error": str(not_configured)}
     if not _reserve_send(order["email"]):

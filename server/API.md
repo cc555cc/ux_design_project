@@ -161,7 +161,16 @@ Sent by the order page after checkout. Request:
 
 `address` is required only for `"delivery"`. Responses: `200 { "sent": true }`, `400` for invalid input, `429` when one address (3 per 10 minutes) or the server (60 per hour) has been sent too many, `503` when email isn't set up, `502` when the mail server refuses.
 
-Sending uses SMTP, configured with environment variables (set them in Railway, or in your shell when running locally; never commit them):
+Sending is configured with environment variables (Railway → Variables when deployed, `server/.env` locally; never commit them). If `BREVO_API_KEY` is set the server uses Brevo's web API, otherwise SMTP.
+
+**Deployed on Railway: use Brevo.** Railway's free/Hobby plans block outgoing SMTP connections, so SMTP times out there (`502` after ~15 s). Brevo sends over HTTPS, which is allowed.
+
+| Variable | Example |
+|---|---|
+| `BREVO_API_KEY` | brevo.com → SMTP & API → API keys → generate a key |
+| `MAIL_FROM` | the sender address, verified in Brevo → Senders (required with Brevo) |
+
+**Locally (or on a host that allows SMTP): Gmail SMTP.**
 
 | Variable | Example |
 |---|---|
